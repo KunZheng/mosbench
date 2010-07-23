@@ -16,8 +16,8 @@ def run_one(ncpu):
         exit(1)
 
     l = p.stdout.readline().strip()
-    m = re.search('ave cycles/pf (\d+).*', l)
-    print "%u\t%s" % (ncpu, m.group(1))
+    m = re.search('ave cycles/pf (\d+), max cycles/pf (\d+)', l)
+    print "%u\t\t%s\t\t%s" % (ncpu, m.group(1), m.group(2))
 
 def main(argv=None):
     if argv is None:
@@ -36,8 +36,8 @@ def main(argv=None):
         print "Specify number of CPUs on command line"
         exit(1)
 
-    print "# mbytes = %u, threading = %u" % (mbytes, threading)
-    print "#\tave(cycles)"
+    print "# mbytes = %u, threading = %u, units = cycles" % (mbytes, threading)
+    print "#\t\tave\t\tmax"
     for c in range(1, ncpus + 1):
         run_one(c)
 
