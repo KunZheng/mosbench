@@ -12,11 +12,13 @@
 #include <string.h>
 #include <time.h>
 
-#include "bench.h"
+#if defined (__SVR4) && defined (__sun)
+#include <sys/types.h>
+#include <sys/processor.h>
+#include <sys/procset.h>
+#endif
 
-#define _STR(x) #x
-#define STR(x) _STR(x)
-#define MAX_PATH 256
+#include "bench.h"
 
 void die(const char* errstr, ...) 
 {
@@ -42,12 +44,18 @@ void edie(const char* errstr, ...)
 
 void setaffinity(int c)
 {
+#if defined (__SVR4) && defined (__sun)
+	processorid_t obind;
+	if (processor_bind(P_LWPID, P_MYID, c, &obind) < 0)
+		edie("setaffinity, processor_bind failed");
+#else
 	cpu_set_t cpuset;
 	c = c % sysconf(_SC_NPROCESSORS_ONLN);
 	CPU_ZERO(&cpuset);
 	CPU_SET(c, &cpuset);
 	if (sched_setaffinity(0, sizeof(cpuset), &cpuset) < 0)
 		edie("setaffinity, sched_setaffinity failed");
+#endif
 }
 
 uint64_t usec(void)

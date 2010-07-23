@@ -1,3 +1,4 @@
+#include <sys/inttypes.h>
 #include <sys/mman.h>
 #include <sys/user.h>
 #include <stdio.h>
@@ -18,6 +19,7 @@ static struct {
 
 static int nbytes;
 static int ncores;
+static unsigned int page_size;
 
 static void *
 worker(void *x)
@@ -28,7 +30,7 @@ worker(void *x)
 
 	setaffinity(i);
 	buf = mmap(0, nbytes, PROT_READ | PROT_WRITE, 
-		   MAP_SHARED | MAP_ANONYMOUS, 0, 0);
+		   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	if (buf == MAP_FAILED)
 		die("mmap failed");
 	end = buf + nbytes;
@@ -41,7 +43,7 @@ worker(void *x)
 		sync_state->start = 1;
 	
 	s = read_tsc();
-	for (; buf != end; buf += PAGE_SIZE)
+	for (; buf != end; buf += page_size)
 		*buf = 1;
 	
 	sync_state->cpu[i].cycle = read_tsc() - s;
@@ -59,14 +61,16 @@ static void waitup(void)
 	for (i = 0; i < ncores; i++) {
 		while (!sync_state->cpu[i].cycle)
 			nop_pause();
+
 		tot += sync_state->cpu[i].cycle;
 		if (sync_state->cpu[i].cycle > max)
 			max = sync_state->cpu[i].cycle;
 	}
-	
-	ave_pf = (tot / ncores) / (nbytes / PAGE_SIZE);
-	max_pf = max / (nbytes / PAGE_SIZE);
-	printf("ave cycles/pf %ld, max cycles/pf %ld\n", ave_pf, max_pf);
+
+	ave_pf = (tot / ncores) / (nbytes / page_size);
+	max_pf = max / (nbytes / page_size);
+	printf("ave cycles/pf %"PRIu64", max cycles/pf %"PRIu64"\n", 
+	       ave_pf, max_pf);
 }
 
 int main(int ac, char **av)
@@ -83,10 +87,13 @@ int main(int ac, char **av)
 	nbytes = atoi(av[2]) * 1024 * 1024;
 	threads = atoi(av[3]);
 
-	sync_state = mmap(0, sizeof(*sync_state), PROT_READ | PROT_WRITE, 
-			  MAP_SHARED | MAP_ANONYMOUS, 0, 0);
+	page_size = get_page_size();
+
+	sync_state = (void *) mmap(0, sizeof(*sync_state), 
+				   PROT_READ | PROT_WRITE, 
+				   MAP_SHARED | MAP_ANONYMOUS, -1, 0);
 	if (sync_state == MAP_FAILED)
-		die("mmap failed");
+		edie("mmap sync_state failed");
 	memset(sync_state, 0, sizeof(*sync_state));
     
 	for (i = 1; i < ncores; i++) {

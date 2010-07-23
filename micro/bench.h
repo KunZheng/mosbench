@@ -1,7 +1,11 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+
+#include <unistd.h>
 #include <string.h>
+
+#include <sys/mman.h>
 
 #include "config.h"
 
@@ -22,14 +26,27 @@ static inline uint64_t read_tsc(void)
 	return ((uint64_t) a) | (((uint64_t) d) << 32);
 }
 
+static inline unsigned int get_page_size(void)
+{
+#if defined (__SVR4) && defined (__sun)
+	return sysconf(_SC_PAGE_SIZE);
+#else
+	return PAGE_SIZE;
+#endif
+}
+
 static inline void * xmalloc(unsigned int sz)
 {
 	size_t s;
 	void *r;
 	
-	s = ((sz - 1) + 64) & ~63;
-	if (posix_memalign(&r, 64, s))
+	s = ((sz - 1) + CACHE_BYTES) & ~(CACHE_BYTES - 1);
+#if defined (__SVR4) && defined (__sun)
+	r = memalign(s, CACHE_BYTES);
+#else
+	if (posix_memalign(&r, CACHE_BYTES, s))
 		edie("posix_memalign");
+#endif
 	memset(r, 0, sz);
 	return r;
 }
