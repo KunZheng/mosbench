@@ -1,6 +1,4 @@
-#include <sys/inttypes.h>
 #include <sys/mman.h>
-#include <sys/user.h>
 #include <stdio.h>
 #include <pthread.h>
 

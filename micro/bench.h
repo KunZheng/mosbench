@@ -2,12 +2,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <unistd.h>
 #include <string.h>
 
-#include <sys/mman.h>
-
 #include "config.h"
+
+#if defined (__SVR4) && defined (__sun)
+#include <sys/mman.h>
+#include <sys/inttypes.h>
+#include <unistd.h>
+#else
+#include <sys/user.h>
+#include <inttypes.h>
+#endif
 
 #define __notret__ __attribute__((noreturn))
 #define __align__ __attribute__((aligned(CACHE_BYTES)))
