@@ -23,11 +23,15 @@ static void *
 worker(void *x)
 {
 	int i = (uintptr_t)x;
+	char *buf, *end;
+	uint64_t s;
+
 	setaffinity(i);
-	char *buf = malloc(nbytes);
-	if (!buf)
-		edie("malloc failed");
-	char *end = buf + nbytes;
+	buf = mmap(0, nbytes, PROT_READ | PROT_WRITE, 
+		   MAP_SHARED | MAP_ANONYMOUS, 0, 0);
+	if (buf == MAP_FAILED)
+		die("mmap failed");
+	end = buf + nbytes;
 	
 	sync_state->cpu[i].ready = 1;
 	if (i)
@@ -36,7 +40,7 @@ worker(void *x)
 	else
 		sync_state->start = 1;
 	
-	uint64_t s = read_tsc();
+	s = read_tsc();
 	for (; buf != end; buf += PAGE_SIZE)
 		*buf = 1;
 	
