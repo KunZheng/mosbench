@@ -9,7 +9,7 @@ CWARNS	= -Wformat=2 -Wextra -Wmissing-noreturn -Wwrite-strings -Wshadow \
 	  -Wswitch-default -Wmissing-prototypes \
 	  -Wmissing-declarations
 CFLAGS  = $(DEFS) -Wall -Werror -fno-strict-aliasing $(CWARNS) \
-	  -g -O3 -D_GNU_SOURCE
+	  -g -O3 -D_GNU_SOURCE -m64
 
 LIBS	= bench.c
 DEPS	= bench.h $(LIBS) 
