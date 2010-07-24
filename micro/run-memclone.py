@@ -5,7 +5,7 @@ import re
 import os
 
 mbytes          = 100
-threading       = 0
+threading       = 1
 
 def run_one(ncpu):
     p = subprocess.Popen(["o/memclone", str(ncpu), str(mbytes), 
@@ -36,6 +36,7 @@ def main(argv=None):
         print "Specify number of CPUs on command line"
         exit(1)
 
+    print "# %s %s %s %s %s" % os.uname()
     print "# mbytes = %u, threading = %u, units = cycles" % (mbytes, threading)
     print "#\t\tave\t\tmax"
     for c in range(1, ncpus + 1):
