@@ -4,8 +4,9 @@
 # the make script has implicit deps. on this script
 #
 
-CPUS=48
-N=4
+MAXCPU=48
+CPUS=1
+N=1
 
 D=/export/home/sbw/exim
 DR=/export/home/sbw/exim.real
@@ -46,6 +47,17 @@ ln -s $TMPFS/exim $D
 #cp -r $DR/* $D
 sync
 
+# enable/disable CPUs
+I=0
+while [ $I -lt $MAXCPU ]; do
+    if [ $I -lt $CPUS ]; then
+	psradm -F -n $I
+    else
+	psradm -F -f $I
+    fi
+    I=`expr $I + 1`
+done
+
 $D/bin/exim -bd -oX 2525 &
 sleep 1
 
@@ -75,6 +87,13 @@ do
 done
 
 expr $T
+
+# enable all CPUs
+I=0
+while [ $I -lt $MAXCPU ]; do
+    psradm -F -n $I    
+    I=`expr $I + 1`
+done
 
 if egrep '^split.*true' $D/etc/configure > /dev/null
 then
