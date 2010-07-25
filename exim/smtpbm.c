@@ -47,7 +47,7 @@ static void xwrite(int s, const char *l)
 	assert(n < sizeof(buf) - 10);
 	strcpy(buf, l);
 	strcat(buf, "\r\n");
-	if(write(s, buf, n+2) != n+2)
+	if(write(s, buf, n + 2) != (int) (n + 2))
 		oops("write");
 }
 

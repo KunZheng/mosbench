@@ -13,8 +13,9 @@ CFLAGS  = $(DEFS) -Wall -Werror -fno-strict-aliasing $(CWARNS) \
 
 ifeq ($(OS), Linux)
 LIBS = 
-else ifeq ($(OS), Solaris)
-LIBS = -lsocket
+endif
+ifeq ($(OS), SunOS)
+LIBS = -lsocket -lnsl
 endif
 
 all: smtpbm
