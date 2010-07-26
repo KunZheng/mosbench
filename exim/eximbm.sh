@@ -7,7 +7,7 @@
 
 MAXCPU=48
 CPUS=1
-N=1
+N=48
 
 OS=`uname`
 
@@ -18,6 +18,7 @@ DR=/export/home/sbw/exim.real
 Q=$D/spool/input
 CO=/export/home/sbw/exim.rates
 SMPTP=./smtpbm
+TRACE=0
 
 TMPFS=/tmp
 
@@ -65,7 +66,7 @@ done
 $D/bin/exim -bd -oX 2525 &
 sleep 1
 
-if [ $OS = "SunOS" ]; then
+if [[ $OS = "SunOS" && $TRACE -ne 0 ]]; then
     pkill dtrace
     dtrace -q -s dtrace/syscall.d > syscall.dtrace &
 fi
@@ -79,13 +80,11 @@ do
   sleep 0.05
 done
 
-if [ $OS = "SunOS" ]; then
+if [[ $OS = "SunOS" && $TRACE -ne 0 ]]; then
     # 30 second dtrace sample
     sleep 30
     pkill dtrace
 fi
-
-echo "waiting..."
 
 I=0
 while [ $I -lt $N ]
@@ -93,10 +92,6 @@ do
   wait
   I=`expr $I + 1`
 done
-
-echo "pkill..."
-
-echo "all done..."
 
 I=0
 T=0
