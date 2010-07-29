@@ -43,10 +43,10 @@
 const char *tmpdir;
 const char *config = "mkdb.config";
 pthread_mutex_t input_lock;
+pthread_t tha[CPUS];
 extern int errno;
 unsigned maxwordlen;
 string prefix;
-pthread_t tha[CPUS];
 int ncore = 1;
 long long maxmem = 256*1024*1024;
 DID did = 1;
