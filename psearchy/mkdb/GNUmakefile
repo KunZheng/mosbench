@@ -1,15 +1,17 @@
-LDB := /Users/kaashoek/hack/db-4.7.25.NC/build_unix/
-#CXXFLAGS := -finstrument-functions -Wall -MD -I$(LDB)
-CXXFLAGS := -O2 -Wall -MD -I$(LDB) # -g
+CXXFLAGS := -O2 -Wall -MD # -g
+#CXXFLAGS += -I$(LDB)
+#LDFLAGS += -L/Users/kaashoek/hack/db-4.7.25.NC/build_unix/
+#LDFLAGS += -pg -lprofiler
 
-pedsort_objects:= args.o pedsort.o
+OBJS := args.o pedsort.o
 
 all: pedsort
 
-pedsort : $(pedsort_objects) 
-	g++ -o pedsort -L$(LDB)  $(pedsort_objects)  -ldb -lpthread # -pg -lprofiler
+pedsort: $(OBJS)
+	g++ -o $@ $(LDFLAGS) $^ -ldb -lpthread
 
+-include $(OBJS:.o=.d)
 
-.PHONY : clean
-clean : 
-	rm pedsort $(shared_objects) $(pedsort_objects)
+.PHONY: clean
+clean: 
+	rm pedsort $(OBJS) $(OBJS:.o=.d)
