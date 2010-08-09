@@ -29,20 +29,14 @@
 #include "mkdb.h"
 #include "primes.h"
 
-// #define COUNTER
+#include <vector>
 
-#define CPUS 48
-#define NSOCKET 8
-#define CPS 6
-#define RR(cid) ((cid % NSOCKET) * CPS + (cid / NSOCKET))
-#define SEQ(cid) (cid)
-#define SCH(cid) ((order == 0) ? SEQ(cid) : RR(cid))   // RR or SEQ
-#define SOCKET(cid) (SCH(cid) / CPS)
-#define SOCKETCORE(cid) (SCH(cid) % CPS)
+// #define COUNTER
 
 const char *tmpdir;
 const char *config = "mkdb.config";
 pthread_mutex_t input_lock;
+int *cpuseq;
 extern int errno;
 unsigned maxwordlen;
 string prefix;
@@ -234,6 +228,72 @@ static int find_prime(int n)
   return find_prime_recurse(0, s-1, n);
 }
 
+struct cpuinfo
+{
+  int proc, phys;
+};
+
+static void get_cpu_sequence(int order, int *seq)
+{
+  // Parse cpuinfo file
+  std::vector<cpuinfo> cpus;
+  
+  FILE *cpuinfo = fopen("/proc/cpuinfo", "r");
+  if (cpuinfo == NULL) {
+    perror("failed to open /proc/cpuinfo");
+    exit(-1);
+  }
+
+  char line[1024];
+  struct cpuinfo cur;
+  while (fgets(line, sizeof line, cpuinfo)) {
+    int *val = NULL;
+    if (strncmp(line, "processor\t", 10) == 0)
+      val = &cur.proc;
+    else if (strncmp(line, "physical id\t", 12) == 0)
+      val = &cur.phys;
+    if (val)
+      *val = atoi(strchr(line, ':')+1);
+
+    if (line[0] == '\n')
+      cpus.push_back(cur);
+  }
+
+  fclose(cpuinfo);
+
+  if (ncore > (int)cpus.size()) {
+    fprintf(stderr, "Number of cores requested %d > available cores %d\n",
+            ncore, (int)cpus.size());
+    exit(-1);
+  }
+
+  if (order == 0) {
+    // Sequential
+    for (int i = 0; i < ncore; ++i)
+      seq[i] = cpus.at(i).proc;
+  } else {
+    // Round-robin
+    int i = 0;
+    while (true) {
+      // Take one processor from each physical chip
+      assert(!cpus.empty());
+      std::vector<struct cpuinfo>::iterator it;
+      cur.phys = -1;
+      for (it = cpus.begin(); it != cpus.end();) {
+        if (it->phys != cur.phys) {
+          cur = *it;
+          seq[i++] = cur.proc;
+          if (i == ncore)
+            return;
+          it = cpus.erase(it);
+        } else {
+          ++it;
+        }
+      }
+    }
+  }
+}
+
 static void 
 initshared(void)
 {
@@ -309,6 +369,9 @@ main(int argc, char *argv[])
   pthread_mutex_init(&input_lock, NULL);
 
   //  printf("npfs: %d\n", get_npfs());
+
+  cpuseq = new int[ncore];
+  get_cpu_sequence(order, cpuseq);
 
   char n2f_dbname[100];
   DB *n2f_db;
@@ -422,7 +485,7 @@ void *dofiles(void *arg)
   int nwordlast = 0;
 
 #ifdef LINUX
-  int c = SCH(cid);
+  int c = cpuseq[cid];
   set_affinity(c);
   // printf("%d assigned to core %d\n", cid, c);
 #endif
