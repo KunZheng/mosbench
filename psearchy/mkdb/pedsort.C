@@ -112,6 +112,8 @@ static struct sharedmem {
 
 #ifdef LINUX
 
+#ifdef COUNTER
+
 #define NPMC 1
 static uint64_t pmccount[NPMC];
 static uint64_t pmclast[CPUS][NPMC];   // [core][num counters]
@@ -135,6 +137,8 @@ static void read_counters(int cid)
       // }
   }			
 }
+
+#endif
 
 static inline void atomic_inc(volatile int *n)
 {
@@ -477,7 +481,7 @@ void *dofiles(void *arg)
     // pthread_mutex_unlock(&input_lock);
     FILE *input = fopen((const char *) files[d], "r");
     if (input == 0) {
-      fprintf(stderr, "dofiles: couldn't open %d: %s %s\n", d, files[d], strerror(errno));
+      fprintf(stderr, "dofiles: couldn't open %lld: %s %s\n", d, files[d], strerror(errno));
       cleanup(cid, 1, pass0files);
     }
     nwordlast = pass0(cid, input, d, &pass0files, &ps);
@@ -569,7 +573,7 @@ lookup(struct pass0_state *ps, char *word)
       return(h);
     h += o;
     ps->nstrcmp++;
-    if(h >= ps->maxhash)
+    if(h >= (unsigned int)ps->maxhash)
       h = h - ps->maxhash;
   }
   fprintf(stderr, "pedsort: hash table full\n");
@@ -666,7 +670,7 @@ pass0(int cid, FILE *input, DID did, int *pass0files, struct pass0_state *ps)
   unsigned wc = 0;
 
   while(1){
-    if((ps->wordi + maxwordlen + 1) > ps->maxword||
+    if((ps->wordi + (signed)maxwordlen + 1) > ps->maxword||
        (ps->infoi + 1) > ps->maxinfo ||
        ps->blocki + 1 >= ps->maxblocks ||
        ps->buckets_used >= ps->maxhash) {
