@@ -152,7 +152,7 @@ class RemoteHost(object):
                 res.append(relpath)
         return res
 
-    def __toOutFile(self, desc):
+    def __toOutFile(self, desc, noCheck = False):
         if desc == CAPTURE:
             return subprocess.PIPE
         elif desc == DISCARD:
@@ -160,26 +160,33 @@ class RemoteHost(object):
         elif desc == STDERR:
             return file("/dev/stderr", "w")
         else:
-            desc = self.__safePath(desc)
+            desc = os.path.expanduser(desc)
+            if not noCheck:
+                desc = self.__safePath(desc)
             self.__makedirs(os.path.dirname(desc))
             return file(desc, "a")
 
     def run(self, cmd, stdin = DISCARD, stdout = DISCARD, stderr = STDERR,
             cwd = None, shell = False, addEnv = {},
-            wait = CHECKED, exitSig = signal.SIGINT):
+            wait = CHECKED, exitSig = signal.SIGINT, noCheck = False):
         # Set up stdin/stdout/stderr
         assert stderr != CAPTURE, "stderr capture not implemented"
         if stdin == DISCARD:
             pstdin = file("/dev/null")
         elif stdin == CAPTURE:
             pstdin = subprocess.PIPE
-        else:
+        elif stdin == STDERR:
             raise ValueError("Illegal stdin %s" % stdin)
-        if stdout == stderr:
-            pstdout = pstderr = self.__toOutFile(stdout)
         else:
-            pstdout = self.__toOutFile(stdout)
-            pstderr = self.__toOutFile(stderr)
+            pstdin = file(os.path.expanduser(stdin), "r")
+        if stdout == stderr:
+            pstdout = pstderr = self.__toOutFile(stdout, noCheck)
+        else:
+            pstdout = self.__toOutFile(stdout, noCheck)
+            pstderr = self.__toOutFile(stderr, noCheck)
+
+        # Expand user
+        cmd = map(os.path.expanduser, cmd)
 
         # Set up environment variables
         env = os.environ.copy()
