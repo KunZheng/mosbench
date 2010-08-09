@@ -379,6 +379,18 @@ main(int argc, char *argv[])
   cpuseq = new int[ncore];
   get_cpu_sequence(order, cpuseq);
 
+  // Increase my FD limit as much as possible
+  struct rlimit fdlim;
+  if (getrlimit(RLIMIT_NOFILE, &fdlim) < 0) {
+    perror("getrlimit failed");
+    exit(-1);
+  }
+  fdlim.rlim_cur = fdlim.rlim_max;
+  if (setrlimit(RLIMIT_NOFILE, &fdlim) < 0) {
+    perror("setrlimit failed");
+    exit(-1);
+  }
+
   char n2f_dbname[100];
   DB *n2f_db;
   int err;
