@@ -88,8 +88,8 @@ import psearchy
 
 psearchy = mk(benchmark = psearchy.runner, nonConst = True)
 
-psearchy *= mk(mode = ["thread", "process"])
-psearchy *= mk(order = ["seq", "rr"])
+psearchy *= (mk(mode = ["thread"]) * mk(order = ["seq"]) +
+             mk(mode = ["process"]) * mk(order = ["seq", "rr"]))
 psearchy *= mk(mem = 1024)
 
 ##################################################################
