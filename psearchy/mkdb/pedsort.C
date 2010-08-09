@@ -29,6 +29,7 @@
 #include "mkdb.h"
 #include "primes.h"
 
+#include <set>
 #include <vector>
 
 // #define COUNTER
@@ -277,19 +278,16 @@ static void get_cpu_sequence(int order, int *seq)
     for (unsigned int i = 0; i < cpus.size(); ++i)
       if (cpus[i].phys > maxphys)
         maxphys = cpus[i].phys;
-    std::vector<bool> phys;
 
     int i = 0;
     while (true) {
       // Take one processor from each physical chip
       assert(!cpus.empty());
-      phys.clear();
-      phys.resize(maxphys + 1);
-
+      std::set<int> phys;
       std::vector<struct cpuinfo>::iterator it;
       for (it = cpus.begin(); it != cpus.end();) {
-        if (!phys[it->phys]) {
-          phys[it->phys] = true;
+        if (!phys.count(it->phys)) {
+          phys.insert(it->phys);
           seq[i++] = it->proc;
           if (i == ncore)
             return;
