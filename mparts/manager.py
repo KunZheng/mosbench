@@ -34,8 +34,16 @@ class Manager(object):
     def __iadd__(self, task):
         """Add a task to the manager.  The task's name must be unique
         within the manager (which generally means its class and keys
-        must be unique."""
+        must be unique.  This also accepts a list of tasks."""
 
+        if isinstance(task, list):
+            for t in task:
+                self.__add(t)
+        else:
+            self.__add(task)
+        return self
+
+    def __add(self, task):
         if task.name in self.__names:
             raise ValueError("A task with the name %s already exists" %
                              task.name)
