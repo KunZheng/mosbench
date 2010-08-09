@@ -3,7 +3,7 @@ import sys, os
 from mparts.manager import Task
 from mparts.host import *
 
-__all__ = ["IXGBE", "SetCPUs", "perfLocked"]
+__all__ = ["IXGBE", "SetCPUs", "PrefetchList", "perfLocked"]
 
 class IXGBE(Task, SourceFileProvider):
     __config__ = ["host", "iface", "queues"]
@@ -93,6 +93,27 @@ class SetCPUs(Task, SourceFileProvider):
         sc = CPU_CACHE[self.host][0]
         sc.stdinClose()
         sc.wait()
+
+PREFETCH_CACHE = set()
+
+class PrefetchList(Task, SourceFileProvider):
+    __config__ = ["host", "filesPath"]
+
+    def __init__(self, host, filesPath, reuse = False):
+        Task.__init__(self, host = host, filesPath = filesPath)
+        self.host = host
+        self.filesPath = filesPath
+        self.reuse = reuse
+
+        self.__script = self.queueSrcFile(host, "prefetch")
+
+    def start(self):
+        if self.reuse:
+            if (self.host, self.filesPath) in PREFETCH_CACHE:
+                return
+            PREFETCH_CACHE.add((self.host, self.filesPath))
+
+        self.host.r.run([self.__script, "-l"], stdin = self.filesPath)
 
 def perfLocked(host, cmdSsh, cmdSudo, cmdRun):
     """This is a host command modifier that takes a performance lock

@@ -1,0 +1,12 @@
+#!/bin/sh
+
+if [ "x$1" = x-l ]; then
+    # Sort to encourage sequential access
+    sort | xargs -d '\n' cat > /dev/null
+else
+    cat >&2 <<EOF
+Usage: $0 -l < files
+
+Prefetch files in to the OS buffer cache.
+EOF
+fi
