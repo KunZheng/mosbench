@@ -1,3 +1,30 @@
+"""A configuration space represents a set of configurations, where a
+configuration is an assignment of some set of variables to values.
+Configuration spaces are constructed from sums and products of smaller
+configuration spaces, where the smallest non-unital configuration
+space assigns a single variable.
+
+Configurations spaces support the iteration protocol and produce
+Config objects.  The variables in a configuration are accessible as
+attributes of the Config object.
+
+A configuration space can be thought of like a polynomial over
+variable assignments.  Once the polynomial has been fully expanded to
+a sum of products, each term gives a single configuration in the
+space.  For example, if you wanted the space to contain all
+combinations of assigning 'a' to 1 and 2 and assigning 'b' to 3 and 4,
+you could construct the space
+  ([a=1]+[a=2])*([b=3]+[b=4])
+fully multiplied out, this yields
+  [a=1]*[b=3] + [a=1]*[b=4] + [a=2]*[b=3] + [a=2]*[b=4]
+Each term in the result gives a single configuration in the space.
+See ConfigSpace.mk for a convenient configuration space constructor.
+
+Abstractly, configuration spaces form a non-commutative algebraic
+semiring over variable assignments, with a few extra operators thrown
+in for convenience.
+"""
+
 __all__ = ["Config", "ConfigSpace"]
 
 def getArg(name, kwarg):
@@ -120,10 +147,7 @@ class ConfigSpace(object):
     """A ConfigSpace is a set of configurations, where each
     configuration assigns some set of variables to values.
     Configuration spaces are constructed by combining smaller
-    configuration spaces either by addition or multiplication.
-    Abstractly, configuration spaces form an algebraic semiring, with
-    variable assignments as the basic elements from which larger
-    expressions can be formed."""
+    configuration spaces either by addition or multiplication."""
 
     def __init__(self, name, val, nonConst = False):
         """Construct a configuration space that assigns a single
