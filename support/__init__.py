@@ -32,44 +32,57 @@ class IXGBE(Task, SourceFileProvider):
 CPU_CACHE = {}
 
 class SetCPUs(Task, SourceFileProvider):
-    __config__ = ["host", "num", "cpus"]
+    __config__ = ["host", "num", "seq"]
 
-    def __init__(self, host, num = None, cpus = None):
-        if num == None and cpus == None:
-            raise ValueError("Either num or cpus must be specified")
-        if num != None and cpus != None:
-            raise ValueError("Only one of num or cpus must be specified")
-
+    def __init__(self, host, num, seq = "seq"):
         Task.__init__(self, host = host)
         self.host = host
-        if num != None:
-            cpus = range(0, num)
-        else:
-            num = len(cpus)
         self.num = num
-        self.cpus = cpus
+        self.seq = seq
 
         self.__script = self.queueSrcFile(host, "set-cpus")
+        self.__cpuSeq = self.queueSrcFile(host, "cpu-sequences")
 
     def start(self):
         if self.host not in CPU_CACHE:
+            # Make sure all CPU's are online
+            self.host.sudo.run([self.__script, "-i"], stdin = DISCARD)
+
+            # Get CPU sequences
+            p = self.host.r.run([self.__cpuSeq], stdout = CAPTURE)
+            seqs = {}
+            for l in p.stdoutRead().splitlines():
+                name, cpus = l.strip().split(" ", 1)
+                seqs[name] = map(int, cpus.split(","))
+
             # Start an interactive set-cpus.  We don't actually use
             # this, but when we disconnect from the host, the EOF to
             # this will cause it to re-enable all CPUs.  This way we
             # don't have to online all of the CPU's between each
-            # experiment.
-            #
-            # XXX Will it be onlining CPU's without the perflock?
+            # experiment.  We'll do our best to online all of the
+            # CPU's at the end before exiting, but even if we die a
+            # horrible death, hopefully this will online everything.
             CPU_CACHE[self.host] = \
-                self.host.sudo.run([self.__script, "-i"],
-                                   stdin = CAPTURE, wait = None)
+                (self.host.sudo.run([self.__script, "-i"],
+                                    stdin = CAPTURE, wait = None),
+                 seqs)
+        else:
+            seqs = CPU_CACHE[self.host][1]
+
+        try:
+            seq = seqs[self.seq]
+        except KeyError:
+            raise ValueError("Unknown CPU sequence %r" % self.seq)
+        if len(seq) < self.num:
+            raise ValueError("Requested %d cores, but only %d are available" %
+                             (self.num, len(seq)))
 
         # oprofile has a habit of panicking if you hot plug CPU's
         # under it
         self.host.sudo.run(["opcontrol", "--deinit"],
                            wait = UNCHECKED)
 
-        cmd = [self.__script, ",".join(map(str, self.cpus))]
+        cmd = [self.__script, ",".join(map(str, seq[:self.num]))]
         self.host.sudo.run(cmd, wait = CHECKED)
 
     def reset(self):
@@ -77,7 +90,7 @@ class SetCPUs(Task, SourceFileProvider):
         if self.host not in CPU_CACHE:
             return
 
-        sc = CPU_CACHE[self.host]
+        sc = CPU_CACHE[self.host][0]
         sc.stdinClose()
         sc.wait()
 

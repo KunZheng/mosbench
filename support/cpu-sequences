@@ -1,0 +1,22 @@
+#!/usr/bin/python
+
+cpuinfo = [dict(map(str.strip, line.split(":", 1))
+                for line in block.splitlines())
+           for block in file("/proc/cpuinfo", "r").read().split("\n\n")
+           if len(block.strip())]
+
+def rr(cpuinfo):
+    while len(cpuinfo):
+        phys = set()
+        next = []
+        for cpu in cpuinfo:
+            if cpu["physical id"] not in phys:
+                phys.add(cpu["physical id"])
+                yield cpu
+            else:
+                next.append(cpu)
+        cpuinfo = next
+
+# Sequential assignment
+print "seq %s" % ",".join(cpu["processor"] for cpu in cpuinfo)
+print "rr %s" % ",".join(cpu["processor"] for cpu in rr(cpuinfo))
