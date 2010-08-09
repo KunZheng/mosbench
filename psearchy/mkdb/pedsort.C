@@ -43,7 +43,6 @@
 const char *tmpdir;
 const char *config = "mkdb.config";
 pthread_mutex_t input_lock;
-pthread_t tha[CPUS];
 extern int errno;
 unsigned maxwordlen;
 string prefix;
@@ -116,7 +115,6 @@ static struct sharedmem {
 
 #define NPMC 1
 static uint64_t pmccount[NPMC];
-static uint64_t pmclast[CPUS][NPMC];   // [core][num counters]
 
 
 static inline uint64_t read_pmc(uint32_t ecx)
@@ -128,6 +126,12 @@ static inline uint64_t read_pmc(uint32_t ecx)
 
 static void read_counters(int cid)
 {
+  static uint64_t (*pmclast)[NPMC];   // [core][num counters]
+  if (!pmclast) {
+    pmclast = new uint64_t[ncore][NPMC];
+    memset(pmclast, 0, ncore * sizeof *pmclast);
+  }
+
   for (int i = 0; i < NPMC; i++) {
     // if (SOCKETCORE(cid) == 0) {
       uint64_t pmc = read_pmc(i);
@@ -354,6 +358,7 @@ main(int argc, char *argv[])
 
   initshared();
   if (threaded) {
+    pthread_t *tha = new pthread_t[ncore];
     void *value;
     for(int i = 0; i < ncore; i++)
       pthread_create(&(tha[i]), NULL, &dofiles, (void *) i);
@@ -361,6 +366,7 @@ main(int argc, char *argv[])
     // dofiles((void *) j);
     for(int i = 0; i < ncore; i++)
       assert(pthread_join(tha[i], &value) == 0);
+    delete[] tha;
   } else {
     for (int i = 1; i < ncore; i++) {
       pid_t p;
@@ -389,7 +395,7 @@ main(int argc, char *argv[])
     }
   }
 #ifdef COUNTER
-  printf("tot = %u\n", shared->tot);
+  printf("tot = %llu\n", (unsigned long long)shared->tot);
 #endif
 
   fprintf(stdout, "%d: ", ncore);
@@ -510,7 +516,7 @@ void *dofiles(void *arg)
   read_counters(cid);
   for (int i = 0; i < NPMC; i++) {
     atomic_add64_return(pmccount[i], &(shared->tot));
-    printf("%d: pmc %u:\n", cid, pmccount[i]);
+    printf("%d: pmc %llu:\n", cid, (unsigned long long)pmccount[i]);
   }
 #endif
 
