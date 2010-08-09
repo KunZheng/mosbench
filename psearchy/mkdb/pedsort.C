@@ -177,8 +177,10 @@ set_affinity(int cpu_id)
  // printf("set_affinity: %d %d\n", tid, cpu_id);
 
  int r = sched_setaffinity(tid, sizeof(mask), &mask);
- if (r < 0)
+ if (r < 0) {
    fprintf(stderr, "couldn't set affinity for %d\n", cpu_id);
+   exit(1);
+ }
 }
 
 static int __attribute__((unused))
@@ -330,6 +332,7 @@ main(int argc, char *argv[])
     data.size = strlen(files[max_did]) + 1;
     if((err = n2f_db->put(n2f_db, NULL, &key, &data, DB_NOOVERWRITE)) != 0){
       fprintf(stderr, "mkdb: db->put failed %s\n", db_strerror(err));
+      exit(1);
     }
 
     max_did++;
