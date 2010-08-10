@@ -44,6 +44,11 @@ class SetCPUs(Task, SourceFileProvider):
         self.__cpuSeq = self.queueSrcFile(host, "cpu-sequences")
 
     def start(self):
+        # oprofile has a habit of panicking if you hot plug CPU's
+        # under it
+        self.host.sudo.run(["opcontrol", "--deinit"],
+                           wait = UNCHECKED)
+
         if self.host not in CPU_CACHE:
             # Make sure all CPU's are online
             self.host.sudo.run([self.__script, "-i"], stdin = DISCARD)
@@ -76,11 +81,6 @@ class SetCPUs(Task, SourceFileProvider):
         if len(seq) < self.num:
             raise ValueError("Requested %d cores, but only %d are available" %
                              (self.num, len(seq)))
-
-        # oprofile has a habit of panicking if you hot plug CPU's
-        # under it
-        self.host.sudo.run(["opcontrol", "--deinit"],
-                           wait = UNCHECKED)
 
         cmd = [self.__script, ",".join(map(str, seq[:self.num]))]
         self.host.sudo.run(cmd, wait = CHECKED)
