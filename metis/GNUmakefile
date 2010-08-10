@@ -25,11 +25,12 @@ O       := obj
 #   default - use small pages (4KB)
 
 SF_MODEL := hugetlb
+HUGETLB_MOUNT := /mnt/huge
 
 ifeq ($(SF_MODEL), hugetlb)
   HPAGE_SK :=$(shell grep Hugepagesize /proc/meminfo | \
 	       sed -e s/Hugepagesize:// -e s/kB// -e 's/[ ]*//')
-  SF_MMOPT := -DHUGETLB -DHPAGE_SK=$(HPAGE_SK) -DHPAGE_FILE=\"/mnt/huge/pagefile\"
+  SF_MMOPT := -DHUGETLB -DHPAGE_SK=$(HPAGE_SK) -DHPAGE_FILE=\"$(HUGETLB_MOUNT)/pagefile\"
 endif
 
 # Streamflow uses super pages of 8MB
