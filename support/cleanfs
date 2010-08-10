@@ -16,10 +16,10 @@ fi
 
 case $1 in
     tmpfs|tmpfs-separate)
-        rm $BASE/$1/[0-9]*/*
+        rm -f $BASE/$1/[0-9]*/*
         ;;
     hugetlb)
-        rm $BASE/$1/pagefile*
+        rm -f $BASE/$1/pagefile*
         ;;
     *)
         echo "Unknown file system type $1" &>2
