@@ -481,7 +481,7 @@ main(int argc, char *argv[])
 
   fprintf(stdout, "%d: ", ncore);
   float r = printrusage(0);
-  fprintf(stdout, " throughput: %f", (1000  / r) / ncore);
+  fprintf(stdout, " throughput: %f jobs/hour/core", ((60*60)  / r) / ncore);
   fprintf(stdout, "\n");
 
   // printf("npfs: %d\n", get_npfs());
@@ -605,7 +605,7 @@ void *dofiles(void *arg)
     shared->first = 0;
     fprintf(stdout, "pedsort %d: nfile %d, nword %d,  hashsize %d (nstrcmp %d), pass0files %d,nwordlast %d, total: ", cid, nfile, nword, ps.maxhash, ps.nstrcmp, pass0files, nwordlast);
     float r = printrusage(0);
-    fprintf(stdout, " throughput: %f", (1000  / r) / ncore);
+    fprintf(stdout, " throughput: %f", ((60*60)  / r) / ncore);
     fprintf(stdout, "\n");
   }
   return 0;
