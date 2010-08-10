@@ -22,25 +22,25 @@ STREAMFLOW_SRC := 	streamflow.c 	\
 			ummap.c
 
 STREAMFLOW_OBJ := $(STREAMFLOW_SRC)
-STREAMFLOW_OBJ := $(patsubst %.c, obj/pkg/streamflow/%.o, $(STREAMFLOW_OBJ))
-STREAMFLOW_OBJ += obj/pkg/streamflow/malloc_new.o
+STREAMFLOW_OBJ := $(patsubst %.c, $(O)/pkg/streamflow/%.o, $(STREAMFLOW_OBJ))
+STREAMFLOW_OBJ += $(O)/pkg/streamflow/malloc_new.o
 
-obj/pkg/streamflow/malloc_new.o: pkg/streamflow/malloc_new.cpp
+$(O)/pkg/streamflow/malloc_new.o: pkg/streamflow/malloc_new.cpp
 	$(Q)mkdir -p $(@D)
 	@echo "CXX	$<"
 	$(Q)$(CXX) -c $(SF_CFLAGS) -Ipkg/streamflow/include-$(SF_ASM) $< -o $@
 
-obj/pkg/streamflow/%.o: pkg/streamflow/%.c
+$(O)/pkg/streamflow/%.o: pkg/streamflow/%.c
 	$(Q)mkdir -p $(@D)
 	@echo "CC	$<"
 	$(Q)$(CC) -c $(SF_CFLAGS) -Ipkg/streamflow/include-$(SF_ASM) $< -o $@
 
-obj/lib/libstreamflow.a: $(STREAMFLOW_OBJ)
+$(O)/lib/libstreamflow.a: $(STREAMFLOW_OBJ)
 	$(Q)mkdir -p $(@D)
 	@echo "AR	$@"
 	$(Q)$(AR) r $@ $^
 
-obj/lib/libstreamflow.so:  $(STREAMFLOW_OBJ)
+$(O)/lib/libstreamflow.so:  $(STREAMFLOW_OBJ)
 	$(Q)mkdir -p $(@D)
 	@echo "SO	$@"
 	$(Q)$(CC) $(SF_CFLAGS) $^ -o $@ -lstdc++ -shared 

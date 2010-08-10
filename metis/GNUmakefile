@@ -5,6 +5,7 @@ PERL   := perl
 TOP	:= $(shell echo $${PWD-'pwd'})
 ARCH 	:= $(shell uname -m | sed -e s/x86_64/amd64/ -e s/i.86/i386/)
 MAXCPUS := $(shell grep -c processor /proc/cpuinfo)
+O       := obj
 
 # Streamflow model: 
 #
@@ -45,10 +46,10 @@ CFLAGS	:= -std=c99 -fms-extensions -D_GNU_SOURCE -Wall $(OPTFLAG) \
 	   -DJOS_NCPU=$(MAXCPUS)
 
 COMMON_LIB := -lc -lm -lpthread -lrt
-LIB	   := -Lobj/lib -lmetis $(COMMON_LIB) 
-SF_LIB	   := -Lobj/lib -lmetis -ldl -lstreamflow -lnuma $(COMMON_LIB)
+LIB	   := -L$(O)/lib -lmetis $(COMMON_LIB) 
+SF_LIB	   := -L$(O)/lib -lmetis -ldl -lstreamflow -lnuma $(COMMON_LIB)
 
-LDEPS := obj/lib/libmetis.a obj/lib/libstreamflow.so
+LDEPS := $(O)/lib/libmetis.a $(O)/lib/libstreamflow.so
 
 # Which MapReduce applications to build?  .sf binaries will be
 # linked against Streamflow.  To run with Streamflow use:
@@ -64,40 +65,40 @@ PROGS := app/kmeans 			    \
 	 app/wrmem			    \
 	 micro/sf_sample
 
-PROGS := $(addprefix obj/,$(PROGS))
+PROGS := $(addprefix $(O)/,$(PROGS))
 PROGS += $(addsuffix .sf,$(PROGS))
 
 all: $(PROGS)
 
-.PRECIOUS: obj/%.o
+.PRECIOUS: $(O)/%.o
 
 include pkg/streamflow/Makefrag
 include lib/Makefrag
 
-obj/%.o: %.c
+$(O)/%.o: %.c
 	$(Q)mkdir -p $(@D)
 	@echo "CC	$<"
 	$(Q)$(CC) $(CFLAGS) -o $@ -c $<
 
-obj/%: obj/%.o $(LDEPS)
+$(O)/%: $(O)/%.o $(LDEPS)
 	@echo "MAKE	$@"
 	$(Q)$(CC) $(CFLAGS) -o $@ $< $(LIB)
 
-obj/%.sf: obj/%.o $(LDEPS)
+$(O)/%.sf: $(O)/%.o $(LDEPS)
 	@echo "MAKE	$@"
 	$(Q)$(CC) $(CFLAGS) -o $@ $< $(SF_LIB)
 
 clean:
-	@rm -rf $(PROGS) *.o *.a *~ *.tmp *.bak *.log *.orig obj
+	@rm -rf $(PROGS) *.o *.a *~ *.tmp *.bak *.log *.orig $(O)
 
 # This magic automatically generates makefile dependencies
 # for header files included from C source files we compile,
 # and keeps those dependencies up-to-date every time we recompile.
 # See 'mergedep.pl' for more information.
-obj/.deps: $(foreach dir, $(OBJDIRS), $(wildcard obj/$(dir)/*.d))
+$(O)/.deps: $(foreach dir, $(OBJDIRS), $(wildcard $(O)/$(dir)/*.d))
 	@mkdir -p $(@D)
 	$(Q)$(PERL) mergedep.pl $@ $^
 
--include obj/.deps
+-include $(O)/.deps
 
 .PHONY: default clean
