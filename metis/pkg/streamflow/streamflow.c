@@ -341,8 +341,14 @@ static int
 hugemunmap(void *addr, size_t length)
 {
 #undef munmap
+    size_t pgsize = HPAGE_SK * 1024;
     if (length >= segsize) {
-	assert(munmap(addr, length) == 0);
+        length = ROUNDUP(length, pgsize);
+	int res = munmap(addr, length);
+	if (res < 0) {
+	  perror("munmap");
+	  assert(0);
+	}
 	return 0;
     }
 #if 0
