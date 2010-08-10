@@ -190,7 +190,8 @@ class RemoteHost(object):
 
         # Set up environment variables
         env = os.environ.copy()
-        env.update(addEnv)
+        for k, v in addEnv.iteritems():
+            env[k] = os.path.expanduser(v)
 
         # Set up death pipe
         if exitSig:

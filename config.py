@@ -93,6 +93,17 @@ psearchy *= (mk(mode = ["thread"]) * mk(order = ["seq"]) +
 psearchy *= mk(mem = 1024)
 
 ##################################################################
+# Metis
+#
+
+import metis
+
+metis = mk(benchmark = metis.runner, nonConst = True)
+
+metis *= mk(streamflow = True)
+metis *= mk(model = ["default", "hugetlb"])
+
+##################################################################
 # Complete configuration
 #
 
@@ -106,7 +117,8 @@ psearchy *= mk(mem = 1024)
 # one configuration.  Furthermore, instead of computing the regular
 # product, we compute a "merge" product, where assignments from the
 # left will override assignments to the same variables from the right.
-configSpace = (psearchy).merge(shared)
+#configSpace = (psearchy + metis).merge(shared)
+configSpace = (metis).merge(shared)
 
 ##################################################################
 # Run
