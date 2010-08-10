@@ -103,13 +103,13 @@ case $1 in
             echo "Failed to parse Hugepagesize from /proc/meminfo" >&2
             exit 1
         fi
-        # Allocate 8 gigs of huge pages
-        pages=$(expr 8 \* 1024 \* 1024 / $pagesize)
+        # Allocate 20 gigs of huge pages
+        pages=$(expr 20 \* 1024 \* 1024 / $pagesize)
         havepages=$(cat /proc/sys/vm/nr_hugepages)
 
         if [ $UNMOUNT ]; then
             umount $D
-            newpages=$(expr $havepages - $pages)
+            newpages=$(expr $havepages - $pages || true)
             echo "Reducing huge page allocation from $havepages to $newpages pages"
             echo $newpages > /proc/sys/vm/nr_hugepages
         else
