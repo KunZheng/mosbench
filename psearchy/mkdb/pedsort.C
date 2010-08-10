@@ -114,9 +114,9 @@ static uint64_t pmccount[NPMC];
 
 static inline uint64_t read_pmc(uint32_t ecx)
 {
-	uint32_t a, d;
-	__asm __volatile("rdpmc" : "=a" (a), "=d" (d) : "c" (ecx));
-	return ((uint64_t) a) | (((uint64_t) d) << 32);
+  uint32_t a, d;
+  __asm __volatile("rdpmc" : "=a" (a), "=d" (d) : "c" (ecx));
+  return ((uint64_t) a) | (((uint64_t) d) << 32);
 }
 
 static void read_counters(int cid)
@@ -131,10 +131,10 @@ static void read_counters(int cid)
     // if (SOCKETCORE(cid) == 0) {
       uint64_t pmc = read_pmc(i);
       if (pmclast[cid][i])
-	pmccount[i] += pmc - pmclast[cid][i];
+        pmccount[i] += pmc - pmclast[cid][i];
       pmclast[cid][i] = pmc;
       // }
-  }			
+  }
 }
 
 #endif
@@ -149,8 +149,8 @@ static inline int atomic_add_return(int i, volatile int *n)
 {
   int __i = i;
   asm volatile("lock; xaddl %0, %1"
-	       : "+r" (i), "+m" (*n)
-	       : : "memory");
+               : "+r" (i), "+m" (*n)
+               : : "memory");
   return i + __i;
 }
 
@@ -158,14 +158,14 @@ static inline int atomic_add64_return(uint64_t i, volatile uint64_t *n)
 {
   int __i = i;
   asm volatile("lock; xaddq %0, %1"
-	       : "+r" (i), "+m" (*n)
-	       : : "memory");
+               : "+r" (i), "+m" (*n)
+               : : "memory");
   return i + __i;
 }
 
 static pid_t gettid(void)
 {
-	return syscall(__NR_gettid);
+  return syscall(__NR_gettid);
 }
 
 void
@@ -308,7 +308,7 @@ initshared(void)
     assert(shared);
   } else {
     shared = (struct sharedmem *) mmap(0, sizeof(struct sharedmem), PROT_READ|PROT_WRITE, 
-				       MAP_SHARED|MAP_ANONYMOUS, 0, 0);
+                                       MAP_SHARED|MAP_ANONYMOUS, 0, 0);
     if (shared == MAP_FAILED) {
       perror("mmap failed");
       exit(-1);
@@ -335,29 +335,29 @@ main(int argc, char *argv[])
   while ((ch = getopt(argc, argv, "t:f:u:c:m:s:p")) != -1) {
     switch (ch) {
       case 't':
-	tmpdir = optarg;
-	break;
+        tmpdir = optarg;
+        break;
       case 'f':
-	config = optarg;
-	break;
+        config = optarg;
+        break;
       case 'u':
-	update_only = true;
-	break;
+        update_only = true;
+        break;
       case 'c':
-	ncore = atoi (optarg);
-	break;
+        ncore = atoi (optarg);
+        break;
       case 'm':
-	maxmem = atoi (optarg);
-	maxmem = maxmem * 1024*1024;
-	break;
+        maxmem = atoi (optarg);
+        maxmem = maxmem * 1024*1024;
+        break;
       case 's':
-	order = atoi(optarg);
-	break;
+        order = atoi(optarg);
+        break;
       case 'p':
-	threaded = 0;
-	break;
+        threaded = 0;
+        break;
       default:
-	break;
+        break;
     }
   }
   argc -= optind;
@@ -365,7 +365,7 @@ main(int argc, char *argv[])
 
   if (argc != 0) {
     fprintf(stderr,"./pedsort [-t tmpdir] [-u (update)] [-f config_file] [-c ncore] [-s sched] [-p]\n");
-	exit(1);
+    exit(1);
   }
 
   Args *a = new Args(config);
@@ -454,13 +454,13 @@ main(int argc, char *argv[])
 
       p = fork();
       if (p < 0) {
-	perror("fork failed");
-	exit(-1);
+        perror("fork failed");
+        exit(-1);
       } else if (p == 0) {  // child
-	shared->run++;
-	while (shared->run < ncore) ;
-	dofiles((void *) i);
-	return 0;
+        shared->run++;
+        while (shared->run < ncore) ;
+        dofiles((void *) i);
+        return 0;
       }
     }
     shared->run++;
@@ -633,7 +633,7 @@ void
 sorttmpname(int cid, int pass, int fn, char *buf)
 {
   sprintf(buf, "%s%d/nis-%d-%d-%d-%lld", tmpdir, cid, getpid(), pass, fn, 
-	  (long long) pthread_self());
+          (long long) pthread_self());
 }
 
 /*
@@ -769,17 +769,17 @@ pass0(int cid, FILE *input, DID did, int *pass0files, struct pass0_state *ps)
     p = ps->wordbytes + ps->wordi;
     while((c = getc(input)) != EOF) {
       if (WORDCHAR(c)) {
-	p[len] = tolower(c);
-	len++;
+        p[len] = tolower(c);
+        len++;
       } else {
-	p[len] = '\0';
-	if (len == 0) {
-	  p++;
-	  skip++;
-	  continue;
-	} else
-	  len++;
-	  break;
+        p[len] = '\0';
+        if (len == 0) {
+          p++;
+          skip++;
+          continue;
+        } else
+          len++;
+          break;
       }
     }
     wc++;
@@ -901,11 +901,11 @@ passN(int cid, DB *db, char *outfile, char *oldoutfile, int pass0files)
       if(ifn == 0 && (ifn + MaxFDS + 1) >= onf) {
         strcpy(oname, outfile);
         ofp = fopen(outfile,"w");
-	done = true;
-	if (!ofp) {
-	  cleanup(cid, 1, pass0files);
-	  exit(1);
-	}
+        done = true;
+        if (!ofp) {
+          cleanup(cid, 1, pass0files);
+          exit(1);
+        }
         nnf++;
       } else {
         sorttmpname(cid, opass + 1, nnf++, oname);
@@ -921,24 +921,24 @@ passN(int cid, DB *db, char *outfile, char *oldoutfile, int pass0files)
         xni = MaxFDS;
 
       if (update_only && done) {
-	fps[0] = fopen(oldoutfile, "r");
-	if (fps[0] == 0) {
-	  fprintf(stderr,"pedsort: WARNING cannot open old index %s\n", oldoutfile);
-	  update_only = false;
-	}else {
-	  eof[0] = zword(fps[0], word[0], sizeof(word[0]));
-	}
-	startfpn = 1;
-	xni++;
+        fps[0] = fopen(oldoutfile, "r");
+        if (fps[0] == 0) {
+          fprintf(stderr,"pedsort: WARNING cannot open old index %s\n", oldoutfile);
+          update_only = false;
+        }else {
+          eof[0] = zword(fps[0], word[0], sizeof(word[0]));
+        }
+        startfpn = 1;
+        xni++;
       }else
-	startfpn = 0;
+        startfpn = 0;
 
       for (fpn = startfpn; fpn < xni; fpn++) {
         sorttmpname(cid, opass, ifn + fpn - startfpn, iname);
         fps[fpn] = fopen(iname, "r");
         if(fps[fpn] == 0){
           fprintf(stderr, "pedsort: cannot open %s %s\n", iname, 
-		  strerror(errno));
+                  strerror(errno));
           cleanup(cid, 1, pass0files);
         }
         eof[fpn] = zword(fps[fpn], word[fpn], sizeof(word[fpn]));
@@ -957,8 +957,8 @@ passN(int cid, DB *db, char *outfile, char *oldoutfile, int pass0files)
         const char *minword = 0;
 
         minmask = (char *)realloc(minmask,sizeof(char)*xni);
-	assert(minmask);
-	bzero(minmask, sizeof(char)*xni);
+        assert(minmask);
+        bzero(minmask, sizeof(char)*xni);
 
         for(fpn = 0; fpn < xni; fpn++){
           if(eof[fpn] == 0){
@@ -969,7 +969,7 @@ passN(int cid, DB *db, char *outfile, char *oldoutfile, int pass0files)
               int x = strcmp(word[fpn], minword);
               if(x < 0){
                 minword = word[fpn];
-		bzero(minmask,sizeof(char)*xni);
+                bzero(minmask,sizeof(char)*xni);
                 minmask[fpn] = 1;
               } else if(x == 0){
                 minmask[fpn] = 1;
@@ -993,23 +993,23 @@ passN(int cid, DB *db, char *outfile, char *oldoutfile, int pass0files)
         putc('\0', ofp);
         xwrite(&nsum, sizeof(nsum), ofp);
 
-	if (done) {
-	  numwords++;
+        if (done) {
+          numwords++;
 
-	  DBT key, data;
-	  bzero(&key,sizeof(key));
-	  bzero(&data,sizeof(data));
+          DBT key, data;
+          bzero(&key,sizeof(key));
+          bzero(&data,sizeof(data));
 
-	  key.data = (void *) minword;
-	  key.size = strlen(minword) + 1;
-	  data.data = &offset;
-	  data.size = sizeof(ind_offset);
-	  if((err = db->put(db, NULL, &key, &data, DB_NOOVERWRITE)) != 0){
-	    // fprintf(stderr, "mkdb: db->put failed %s\n", db_strerror(err));
-	  }
-	  offset += strlen(minword) + 1 + sizeof(nsum) + nsum * sizeof(PostIt);
+          key.data = (void *) minword;
+          key.size = strlen(minword) + 1;
+          data.data = &offset;
+          data.size = sizeof(ind_offset);
+          if((err = db->put(db, NULL, &key, &data, DB_NOOVERWRITE)) != 0){
+            // fprintf(stderr, "mkdb: db->put failed %s\n", db_strerror(err));
+          }
+          offset += strlen(minword) + 1 + sizeof(nsum) + nsum * sizeof(PostIt);
 
-	}
+        }
 
         /*
          * Spit out the position lists, first temporary first.
@@ -1026,26 +1026,26 @@ passN(int cid, DB *db, char *outfile, char *oldoutfile, int pass0files)
 
       for(fpn = 0; fpn < xni; fpn++){
         fclose(fps[fpn]);
-	if (startfpn && fpn == 0)
-	  continue;
+        if (startfpn && fpn == 0)
+          continue;
         sorttmpname(cid, opass, ifn + fpn - startfpn, iname);
-	if(unlink(iname) != 0){
-	  fprintf(stderr, "pedsort: unlink %s failed %s\n", iname,
-		  strerror(errno));
-	  cleanup(cid, 1, pass0files);
+        if(unlink(iname) != 0){
+          fprintf(stderr, "pedsort: unlink %s failed %s\n", iname,
+                  strerror(errno));
+          cleanup(cid, 1, pass0files);
         }
       }
       ifn += MaxFDS;
       
       if(fclose(ofp) != 0){
         fprintf(stderr, "pedsort: write to %s failed %s\n", oname, 
-		strerror(errno));
+                strerror(errno));
         cleanup(cid, 1, pass0files);
       }
       if(done){
         // fprintf(stderr, "pedsort: merged %d files, %u words, ", onf, numwords);
         //fprintf(stderr, "\n");
-	rename(outfile, oldoutfile);
+        rename(outfile, oldoutfile);
         return;
       }
     }

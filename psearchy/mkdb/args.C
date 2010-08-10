@@ -19,7 +19,7 @@ Args::Args(const char *fname)
       first[i] = '\0';
       second[j] = '\0';
       if (!skip)  {
-	_args.push_back(make_pair(string(first),string(second)));
+        _args.push_back(make_pair(string(first),string(second)));
       }
       memset (first, 1, 200);
       memset (second, 1, 200);
@@ -27,17 +27,17 @@ Args::Args(const char *fname)
       skip = false;
     }else if (!skip) {
       if (c == '=') {
-	if (first[i]!='\0')
-	  first[i++] = '\0';
-	continue;
+        if (first[i]!='\0')
+          first[i++] = '\0';
+        continue;
       }
       if (i >= 200 || j >= 200)
-	continue;
+        continue;
 
       if (i == 0 || first[i-1] != '\0')
-	first[i++] = c;
+        first[i++] = c;
       else
-	second[j++] = c;
+        second[j++] = c;
     }
   }
 
