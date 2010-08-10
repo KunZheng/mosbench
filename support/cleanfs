@@ -1,0 +1,28 @@
+#!/bin/sh
+
+set -e
+
+BASE=/tmp/mosbench
+
+if [ $# != 1 ]; then
+    cat >&2 <<EOF
+Usage: $0 fstype
+
+Remove files in the MOSBENCH mount for the given file system type (as
+created by mkmounts).
+EOF
+    exit 2
+fi
+
+case $1 in
+    tmpfs|tmpfs-separate)
+        rm $BASE/$1/[0-9]*/*
+        ;;
+    hugetlb)
+        rm $BASE/$1/pagefile*
+        ;;
+    *)
+        echo "Unknown file system type $1" &>2
+        exit 1
+        ;;
+esac

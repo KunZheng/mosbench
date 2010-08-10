@@ -115,6 +115,24 @@ class PrefetchList(Task, SourceFileProvider):
 
         self.host.r.run([self.__script, "-l"], stdin = self.filesPath)
 
+class FileSystem(Task, SourceFileProvider):
+    __config__ = ["host", "fstype"]
+
+    def __init__(self, host, fstype, clean = True):
+        Task.__init__(self, host = host, fstype = fstype)
+        self.host = host
+        self.fstype = fstype
+        self.clean = clean
+        assert '/' not in fstype
+        self.path = "/tmp/mosbench/%s/" % fstype
+        if clean:
+            self.__script = self.queueSrcFile(host, "cleanfs")
+        else:
+            del self.start
+
+    def start(self):
+        self.host.r.run([self.__script, self.fstype])
+
 def perfLocked(host, cmdSsh, cmdSudo, cmdRun):
     """This is a host command modifier that takes a performance lock
     using 'perflock' while the remote RPC server is running."""
