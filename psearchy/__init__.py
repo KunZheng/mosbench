@@ -1,7 +1,7 @@
 from mparts.manager import Task
 from mparts.host import HostInfo, CHECKED, UNCHECKED
 from mparts.util import Progress
-from support import SetCPUs, PrefetchList
+from support import SetCPUs, PrefetchList, FileSystem
 
 import os
 
@@ -95,17 +95,18 @@ class Psearchy(object):
 
     @staticmethod
     def run(m, cfg):
-        # XXX Clean up output directories between runs?
         host = cfg.primaryHost
         m += host
         m += HostInfo(host)
+        fs = FileSystem(host, cfg.fs, clean = True)
+        m += fs
         psearchyPath = os.path.join(cfg.benchRoot, "psearchy")
         files = Mkfiles(host, psearchyPath, cfg.textRoot)
         m += files
         m += PrefetchList(host, files.filesPath, reuse = True)
         if cfg.hotplug:
             m += SetCPUs(host = host, num = cfg.cores, seq = cfg.order)
-        m += Mkdb(host, psearchyPath, files.filesPath, "/tmp/mosbench/%s/" % cfg.fs,
+        m += Mkdb(host, psearchyPath, files.filesPath, fs.path,
                   cfg.cores, cfg.mode, cfg.order, cfg.mem)
         # m += cfg.monitors
         m.run()
