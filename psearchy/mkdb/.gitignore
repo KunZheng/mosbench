@@ -1,3 +1,4 @@
 *.d
 *.o
+primes.C
 pedsort

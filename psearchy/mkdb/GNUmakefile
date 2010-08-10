@@ -3,9 +3,12 @@ CXXFLAGS := -O2 -Wall -MD # -g
 #LDFLAGS += -L/Users/kaashoek/hack/db-4.7.25.NC/build_unix/
 #LDFLAGS += -pg -lprofiler
 
-OBJS := args.o pedsort.o
+OBJS := args.o pedsort.o primes.o
 
 all: pedsort
+
+primes.C: mkprimes
+	./mkprimes > $@
 
 pedsort: $(OBJS)
 	g++ -o $@ $(LDFLAGS) $^ -ldb -lpthread
@@ -14,4 +17,4 @@ pedsort: $(OBJS)
 
 .PHONY: clean
 clean: 
-	rm pedsort $(OBJS) $(OBJS:.o=.d)
+	rm pedsort primes.C $(OBJS) $(OBJS:.o=.d)

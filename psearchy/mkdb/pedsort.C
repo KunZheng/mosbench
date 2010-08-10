@@ -27,7 +27,6 @@
 #endif
 #include "args.h"
 #include "mkdb.h"
-#include "primes.h"
 
 #include <set>
 #include <vector>
@@ -48,6 +47,8 @@ DID max_did = 1;
 int first = 1;
 int order = 0;
 int threaded = 1;
+
+extern int nprimes, primes[];
 
 #define NFILES 100000
 #define MAXFILENAME 200
@@ -225,8 +226,7 @@ static int find_prime_recurse(int l, int u, int n)
 
 static int find_prime(int n)
 {
-  int s = sizeof(primes)/sizeof(int);
-  return find_prime_recurse(0, s-1, n);
+  return find_prime_recurse(0, nprimes-1, n);
 }
 
 struct cpuinfo
