@@ -1,5 +1,5 @@
 from mparts.manager import Task
-from mparts.host import CHECKED, UNCHECKED
+from mparts.host import HostInfo, CHECKED, UNCHECKED
 from mparts.util import Progress
 from support import SetCPUs, PrefetchList
 
@@ -15,11 +15,11 @@ class Mkdb(Task):
     ORDER_SEQ = intern("seq")
     ORDER_RR = intern("rr")
 
-    __config__ = ["host", "binPath", "filesPath", "dbPath",
+    __config__ = ["host", "psearchyPath", "filesPath", "dbPath",
                   "mode", "order", "mem",
                   "cores", "result", "units"]
 
-    def __init__(self, host, binPath, filesPath, dbPath, cores,
+    def __init__(self, host, psearchyPath, filesPath, dbPath, cores,
                  mode = MODE_THREAD, order = ORDER_SEQ,
                  mem = 256):
         assert mode in [Mkdb.MODE_THREAD, Mkdb.MODE_PROCESS], \
@@ -29,7 +29,7 @@ class Mkdb(Task):
 
         Task.__init__(self, host = host)
         self.host = host
-        self.binPath = binPath
+        self.psearchyPath = psearchyPath
         self.filesPath = filesPath
         self.dbPath = dbPath
         self.cores = cores
@@ -41,7 +41,7 @@ class Mkdb(Task):
     # XXX Use a common results-bearing superclass to make this easy to find
     def wait(self):
         # Construct command
-        cmd = [os.path.join(self.binPath, "mkdb", "pedsort"),
+        cmd = [os.path.join(self.psearchyPath, "mkdb", "pedsort"),
                "-t", self.dbPath,
                "-c", str(self.cores),
                "-m", str(self.mem)]
@@ -64,16 +64,16 @@ class Mkdb(Task):
 
 __all__.append("Mkfiles")
 class Mkfiles(Task):
-    __config__ = ["host", "binPath", "baseDir"]
+    __config__ = ["host", "psearchyPath", "baseDir"]
 
-    def __init__(self, host, binPath, baseDir):
+    def __init__(self, host, psearchyPath, baseDir):
         Task.__init__(self, host = host)
         self.host = host
-        self.binPath = binPath
+        self.psearchyPath = psearchyPath
         self.baseDir = baseDir
 
         self.filesPath = \
-            os.path.join(self.binPath, "files-%08x" % abs(hash(baseDir)))
+            os.path.join(self.psearchyPath, "files-%08x" % abs(hash(baseDir)))
 
     def start(self):
         # Do I need to construct the files list?
@@ -82,7 +82,7 @@ class Mkfiles(Task):
         if test.getCode() != 0:
             # Yes
             with Progress("Generating files list"):
-                self.host.r.run([os.path.join(self.binPath, "mkfiles"),
+                self.host.r.run([os.path.join(self.psearchyPath, "mkfiles"),
                                  self.baseDir],
                                 stdout = self.filesPath + ".tmp",
                                 noCheck = True)
@@ -98,15 +98,16 @@ class Psearchy(object):
         # XXX Clean up output directories between runs?
         host = cfg.primaryHost
         m += host
-        binPath = os.path.join(cfg.benchRoot, "psearchy")
-        files = Mkfiles(host, binPath, cfg.textRoot)
+        m += HostInfo(host)
+        psearchyPath = os.path.join(cfg.benchRoot, "psearchy")
+        files = Mkfiles(host, psearchyPath, cfg.textRoot)
         m += files
         m += PrefetchList(host, files.filesPath, reuse = True)
         if cfg.hotplug:
             m += SetCPUs(host = host, num = cfg.cores, seq = cfg.order)
-        m += Mkdb(host, binPath, files.filesPath, "/tmp/mosbench/%s/" % cfg.fs,
+        m += Mkdb(host, psearchyPath, files.filesPath, "/tmp/mosbench/%s/" % cfg.fs,
                   cfg.cores, cfg.mode, cfg.order, cfg.mem)
-    #    m += cfg.monitors
+        # m += cfg.monitors
         m.run()
 
 __all__.append("runner")
