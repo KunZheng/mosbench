@@ -297,8 +297,9 @@ hugemmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 	sprintf(path, "%s%d", HPAGE_FILE, thread_id);
 	hugefd = open(path, O_CREAT | O_RDWR, 0755);
 	if (hugefd < 0) {
-	    printf
-		("failed to open %s. Make sure the hugetlbfs is mounted, .\n"
+	    fprintf
+		(stderr,
+		 "failed to open %s. Make sure the hugetlbfs is mounted, .\n"
 		 "and the user has the permission to write. See GNUmakefile "
 		 "for more details.\n", path);
 	    exit(EXIT_FAILURE);
@@ -313,7 +314,7 @@ hugemmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 	char *p = mmap(addr, len, PROT_READ | PROT_WRITE, MAP_PRIVATE, hugefd,
 		       fd_off);
 	if (p == MAP_FAILED) {
-	    printf("Out of memory: please mount hugetlbfs with sufficient memory, %ld mb\n", fd_off / 1024 / 1024);
+	    fprintf(stderr, "Out of memory: please mount hugetlbfs with sufficient memory, %ld mb\n", fd_off / 1024 / 1024);
 	    exit(EXIT_FAILURE);
 	}
 	fd_off += len;
@@ -324,7 +325,7 @@ hugemmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 	    mmap(addr, segsize, PROT_READ | PROT_WRITE, MAP_SHARED, hugefd,
 		 fd_off);
 	if (basep == MAP_FAILED) {
-	    printf("Out of memory: please mount hugetlbfs with sufficient memory\n");
+	    fprintf(stderr, "Out of memory: please mount hugetlbfs with sufficient memory\n");
 	    exit(EXIT_FAILURE);
 	}
 	// TODO: keep track of the usage of each segment to munmap it in 
@@ -397,7 +398,7 @@ hybridmmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 	    }
 	    basep = mmap(0, maxlen, prot, flags, fd, offset);
 	    if (basep == MAP_FAILED) {
-		printf("Failed to map %lx bytes\n", maxlen);
+		fprintf(stderr, "Failed to map %lx bytes\n", maxlen);
 		exit(0);
 	    }
 #ifdef PREFAULT
@@ -417,7 +418,7 @@ hybridmmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 	off_t alloced =
 	    atmc_fetch_and_add(&hused, len / pgsize) - len / pgsize;
 	if (alloced > maxlen) {
-	    printf("streamflow of hybridmmap: Out of memory\n");
+	    fprintf(stderr, "streamflow of hybridmmap: Out of memory\n");
 	    exit(0);
 	}
 	return basep + alloced * pgsize;
@@ -426,7 +427,7 @@ hybridmmap(void *addr, size_t len, int prot, int flags, int fd, off_t offset)
 
     char *p = mmap(addr, len, prot, flags, fd, offset);
     if (p == MAP_FAILED) {
-	printf("Failed to map %lx bytes\n", len);
+	fprintf(stderr, "Failed to map %lx bytes\n", len);
 	exit(0);
     }
     return p;
@@ -853,7 +854,7 @@ buddy_free(superpage_t * super, void *start, size_t length)
     unsigned int order = quick_log2(length / PAGE_SIZE);
     unsigned int curr_order;
     if (super == 0) {
-	printf("super is 0,length is %zu\n", length);
+	fprintf(stderr, "super is 0,length is %zu\n", length);
 	exit(0);
     }
 
@@ -1093,7 +1094,7 @@ page_alloc(size_t size)
 	     -1, 0);
     //  printf("streamflow mmap addr %p size %lx \n", addr,size);
     if (addr == MAP_FAILED) {
-	printf("failed to page_alloc");
+	fprintf(stderr, "failed to page_alloc");
 	exit(1);
     }
 
