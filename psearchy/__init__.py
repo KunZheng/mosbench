@@ -16,9 +16,10 @@ class Mkdb(Task):
     ORDER_RR = intern("rr")
 
     __config__ = ["host", "binPath", "filesPath", "dbPath",
-                  "ncores", "mode", "order", "mem"]
+                  "mode", "order", "mem",
+                  "cores", "result", "units"]
 
-    def __init__(self, host, binPath, filesPath, dbPath, ncores,
+    def __init__(self, host, binPath, filesPath, dbPath, cores,
                  mode = MODE_THREAD, order = ORDER_SEQ,
                  mem = 256):
         assert mode in [Mkdb.MODE_THREAD, Mkdb.MODE_PROCESS], \
@@ -31,26 +32,35 @@ class Mkdb(Task):
         self.binPath = binPath
         self.filesPath = filesPath
         self.dbPath = dbPath
-        self.ncores = ncores
+        self.cores = cores
         self.mode = mode
         self.order = order
         self.mem = mem
 
+    # XXX Run multiple trials and take the best
+    # XXX Use a common results-bearing superclass to make this easy to find
     def wait(self):
+        # Construct command
         cmd = [os.path.join(self.binPath, "mkdb", "pedsort"),
                "-t", self.dbPath,
-               "-c", str(self.ncores),
+               "-c", str(self.cores),
                "-m", str(self.mem)]
         if self.mode == Mkdb.MODE_PROCESS:
             cmd.append("-p")
         if self.order == Mkdb.ORDER_RR:
             cmd.extend(["-s", "1"])
 
+        # Run
         logPath = self.host.getLogPath(self)
         self.host.r.run(cmd, stdin = self.filesPath, stdout = logPath,
                         wait = CHECKED)
 
-        # XXX Get result
+        # Get result
+        log = self.host.r.readFile(logPath)
+        last = log.strip().splitlines()[-1]
+        last = last.split("throughput:", 1)[1].strip()
+        self.result = float(last.split()[0])
+        self.units = last.split()[1]
 
 __all__.append("Mkfiles")
 class Mkfiles(Task):
