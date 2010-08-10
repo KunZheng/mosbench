@@ -18,6 +18,7 @@ fstype's are
 
 tmpfs-separate   Separate tmpfs per CPU.
 tmpfs            One unified tmpfs with per-CPU directories.
+hugetlb          hugetlbfs for Metis with super-pages.
 
 All file system mounts will be of the form $BASE/fstype[/n].
 EOF
@@ -73,7 +74,7 @@ case $1 in
                 umount $D || echo "Failed to unmount $D" >&2
             else
                 mkdir -p $D
-                $MOUNT -t tmpfs tmpfs $D
+                $MOUNT -t tmpfs none $D
             fi
         done
         ;;
@@ -83,12 +84,40 @@ case $1 in
             umount $D
         else
             mkdir -p $D
-            $MOUNT -t tmpfs tmpfs $D
+            $MOUNT -t tmpfs none $D
             for cpu in $CPUS; do
                 D=$BASE/$1/$cpu
                 mkdir -m 0755 $D
                 chown $FSUID:$FSGID $D
             done
+        fi
+        ;;
+    hugetlb)
+        D=$BASE/$1
+        if ! grep -q hugetlbfs /proc/filesystems; then
+            echo "This kernel doesn't support hugetlbfs.  See CONFIG_HUGETLBFS" >&2
+            exit 1
+        fi
+        pagesize=$(awk '/^Hugepagesize:/&&$3=="kB"{print $2}' < /proc/meminfo)
+        if [ "x$pagesize" = x ]; then
+            echo "Failed to parse Hugepagesize from /proc/meminfo" >&2
+            exit 1
+        fi
+        # Allocate 8 gigs of huge pages
+        pages=$(expr 8 \* 1024 \* 1024 / $pagesize)
+        havepages=$(cat /proc/sys/vm/nr_hugepages)
+
+        if [ $UNMOUNT ]; then
+            umount $D
+            newpages=$(expr $havepages - $pages)
+            echo "Reducing huge page allocation from $havepages to $newpages pages"
+            echo $newpages > /proc/sys/vm/nr_hugepages
+        else
+            mkdir -p $D
+            $MOUNT -t hugetlbfs none $D
+            newpages=$(expr $havepages + $pages)
+            echo "Increasing huge page allocation from $havepages to $newpages pages"
+            echo $newpages > /proc/sys/vm/nr_hugepages
         fi
         ;;
     *)
