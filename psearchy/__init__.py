@@ -1,14 +1,14 @@
 from mparts.manager import Task
 from mparts.host import HostInfo, CHECKED, UNCHECKED
 from mparts.util import Progress
-from support import SetCPUs, PrefetchList, FileSystem
+from support import ResultsProvider, SetCPUs, PrefetchList, FileSystem
 
 import os
 
 __all__ = []
 
 __all__.append("Mkdb")
-class Mkdb(Task):
+class Mkdb(Task, ResultsProvider):
     MODE_THREAD = intern("thread")
     MODE_PROCESS = intern("process")
 
@@ -16,8 +16,7 @@ class Mkdb(Task):
     ORDER_RR = intern("rr")
 
     __config__ = ["host", "psearchyPath", "filesPath", "dbPath",
-                  "mode", "order", "mem",
-                  "cores", "result", "units"]
+                  "mode", "order", "mem"]
 
     def __init__(self, host, psearchyPath, filesPath, dbPath, cores,
                  mode = MODE_THREAD, order = ORDER_SEQ,
@@ -28,17 +27,16 @@ class Mkdb(Task):
             "Invalid order %s" % order
 
         Task.__init__(self, host = host)
+        ResultsProvider.__init__(self, cores)
         self.host = host
         self.psearchyPath = psearchyPath
         self.filesPath = filesPath
         self.dbPath = dbPath
-        self.cores = cores
         self.mode = mode
         self.order = order
         self.mem = mem
 
     # XXX Run multiple trials and take the best
-    # XXX Use a common results-bearing superclass to make this easy to find
     def wait(self):
         # Construct command
         cmd = [os.path.join(self.psearchyPath, "mkdb", "pedsort"),
@@ -59,8 +57,7 @@ class Mkdb(Task):
         log = self.host.r.readFile(logPath)
         last = log.strip().splitlines()[-1]
         last = last.split("throughput:", 1)[1].strip()
-        self.result = float(last.split()[0])
-        self.units = last.split()[1]
+        self.setResults(float(last.split()[0]), last.split()[1])
 
 __all__.append("Mkfiles")
 class Mkfiles(Task):

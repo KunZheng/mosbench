@@ -3,7 +3,17 @@ import sys, os
 from mparts.manager import Task
 from mparts.host import *
 
-__all__ = ["IXGBE", "SetCPUs", "PrefetchList", "perfLocked"]
+__all__ = ["ResultsProvider", "IXGBE", "SetCPUs", "PrefetchList", "perfLocked"]
+
+class ResultsProvider(object):
+    __config__ = ["cores", "result", "units"]
+
+    def __init__(self, cores):
+        self.cores = cores
+
+    def setResults(self, result, units):
+        self.result = result
+        self.units = units
 
 class IXGBE(Task, SourceFileProvider):
     __config__ = ["host", "iface", "queues"]
