@@ -126,5 +126,8 @@ configSpace = (metis).merge(shared)
 
 if __name__ == "__main__":
     from mparts.manager import generateManagers
+    from mparts.rpc import print_remote_exception
+    import sys
+    sys.excepthook = print_remote_exception
     for (m, cfg) in generateManagers("results", configSpace):
         cfg.benchmark.run(m, cfg)
