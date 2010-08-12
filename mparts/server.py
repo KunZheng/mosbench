@@ -6,12 +6,12 @@ from mparts.rpc import RPCServer, RPCProxy
 __all__ = ["CAPTURE", "STDERR", "DISCARD",
            "CHECKED", "UNCHECKED"]
 
-CAPTURE = hash("CAPTURE")
-STDERR = hash("STDERR")
-DISCARD = hash("DISCARD")
+CAPTURE = "\0CAPTURE"
+STDERR = "\0STDERR"
+DISCARD = "\0DISCARD"
 
-CHECKED = hash("CHECKED")
-UNCHECKED = hash("UNCHECKED")
+CHECKED = "CHECKED"
+UNCHECKED = "UNCHECKED"
 
 class Process(object):
     def __init__(self, cmd, p, dw):
