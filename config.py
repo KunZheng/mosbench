@@ -61,6 +61,10 @@ shared *= mk(textRoot = "~/scale-linux")
 # names here must match the available file system types in mkmounts.
 shared *= mk(fs = "tmpfs-separate")
 
+# trials is the number of times to run each benchmark.  The best
+# result will be taken.
+shared *= mk(trials = 3)
+
 # monitors specifies the set of monitoring tasks to run during each
 # benchmark.  This can be overridden for individual benchmarks (though
 # this will replace the list, not add to it).  See the note for
@@ -118,7 +122,8 @@ metis *= mk(model = ["default", "hugetlb"])
 # product, we compute a "merge" product, where assignments from the
 # left will override assignments to the same variables from the right.
 #configSpace = (psearchy + metis).merge(shared)
-configSpace = (metis).merge(shared)
+configSpace = (psearchy).merge(shared)
+#configSpace = (metis).merge(shared)
 
 ##################################################################
 # Run

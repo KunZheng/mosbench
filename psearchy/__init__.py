@@ -1,14 +1,14 @@
 from mparts.manager import Task
 from mparts.host import HostInfo, CHECKED, UNCHECKED
 from mparts.util import Progress
-from support import ResultsProvider, SetCPUs, PrefetchList, FileSystem
+from support import BenchmarkRunner, SetCPUs, PrefetchList, FileSystem
 
 import os
 
 __all__ = []
 
 __all__.append("Mkdb")
-class Mkdb(Task, ResultsProvider):
+class Mkdb(Task, BenchmarkRunner):
     MODE_THREAD = intern("thread")
     MODE_PROCESS = intern("process")
 
@@ -20,14 +20,14 @@ class Mkdb(Task, ResultsProvider):
 
     def __init__(self, host, psearchyPath, filesPath, dbPath, cores,
                  mode = MODE_THREAD, order = ORDER_SEQ,
-                 mem = 256):
+                 mem = 256, trials = 3):
         assert mode in [Mkdb.MODE_THREAD, Mkdb.MODE_PROCESS], \
             "Invalid mode %s" % mode
         assert order in [Mkdb.ORDER_SEQ, Mkdb.ORDER_RR], \
             "Invalid order %s" % order
 
         Task.__init__(self, host = host)
-        ResultsProvider.__init__(self, cores)
+        BenchmarkRunner.__init__(self, cores, trials)
         self.host = host
         self.psearchyPath = psearchyPath
         self.filesPath = filesPath
@@ -36,8 +36,7 @@ class Mkdb(Task, ResultsProvider):
         self.order = order
         self.mem = mem
 
-    # XXX Run multiple trials and take the best
-    def wait(self):
+    def runTrial(self, m):
         # Construct command
         cmd = [os.path.join(self.psearchyPath, "mkdb", "pedsort"),
                "-t", self.dbPath,
@@ -57,7 +56,7 @@ class Mkdb(Task, ResultsProvider):
         log = self.host.r.readFile(logPath)
         last = log.strip().splitlines()[-1]
         last = last.split("throughput:", 1)[1].strip()
-        self.setResults(float(last.split()[0]), last.split()[1])
+        return float(last.split()[0]), last.split()[1]
 
 __all__.append("Mkfiles")
 class Mkfiles(Task):
@@ -104,7 +103,7 @@ class Psearchy(object):
         if cfg.hotplug:
             m += SetCPUs(host = host, num = cfg.cores, seq = cfg.order)
         m += Mkdb(host, psearchyPath, files.filesPath, fs.path,
-                  cfg.cores, cfg.mode, cfg.order, cfg.mem)
+                  cfg.cores, cfg.mode, cfg.order, cfg.mem, cfg.trials)
         # m += cfg.monitors
         m.run()
 

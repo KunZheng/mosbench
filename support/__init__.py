@@ -3,8 +3,9 @@ import sys, os
 from mparts.manager import Task
 from mparts.host import *
 
-__all__ = ["ResultsProvider", "IXGBE", "SetCPUs", "PrefetchList", "perfLocked"]
+__all__ = []
 
+__all__.append("ResultsProvider")
 class ResultsProvider(object):
     __config__ = ["cores", "result", "units"]
 
@@ -15,6 +16,30 @@ class ResultsProvider(object):
         self.result = result
         self.units = units
 
+__all__.append("BenchmarkRunner")
+class BenchmarkRunner(ResultsProvider):
+    __config__ = ["trials"]
+
+    def __init__(self, cores, trials):
+        ResultsProvider.__init__(self, cores)
+        self.trials = trials
+        assert hasattr(self, "runTrial")
+
+    def wait(self, m):
+        best = None
+        for t in range(self.trials):
+            self.log("Trial %d/%d" % (t+1, self.trials))
+            result, units = self.runTrial(m)
+            self.log("=> %s %s" % (result, units))
+            if best == None:
+                best = result, units
+            else:
+                if units != best[1]:
+                    raise ValueError("Units changed between trials")
+                best = (max(best[0], result), units)
+        self.setResults(*best)
+
+__all__.append("IXGBE")
 class IXGBE(Task, SourceFileProvider):
     __config__ = ["host", "iface", "queues"]
 
@@ -41,6 +66,7 @@ class IXGBE(Task, SourceFileProvider):
 
 CPU_CACHE = {}
 
+__all__.append("SetCPUs")
 class SetCPUs(Task, SourceFileProvider):
     __config__ = ["host", "num", "seq"]
 
@@ -106,6 +132,7 @@ class SetCPUs(Task, SourceFileProvider):
 
 PREFETCH_CACHE = set()
 
+__all__.append("PrefetchList")
 class PrefetchList(Task, SourceFileProvider):
     __config__ = ["host", "filesPath"]
 
@@ -125,6 +152,7 @@ class PrefetchList(Task, SourceFileProvider):
 
         self.host.r.run([self.__script, "-l"], stdin = self.filesPath)
 
+__all__.append("FileSystem")
 class FileSystem(Task, SourceFileProvider):
     __config__ = ["host", "fstype"]
 
@@ -143,6 +171,7 @@ class FileSystem(Task, SourceFileProvider):
     def start(self):
         self.host.r.run([self.__script, self.fstype])
 
+__all__.append("perfLocked")
 def perfLocked(host, cmdSsh, cmdSudo, cmdRun):
     """This is a host command modifier that takes a performance lock
     using 'perflock' while the remote RPC server is running."""
