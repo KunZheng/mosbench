@@ -165,12 +165,23 @@ class FileSystem(Task, SourceFileProvider):
         self.path = "/tmp/mosbench/%s/" % fstype
         if clean:
             self.__script = self.queueSrcFile(host, "cleanfs")
-        else:
-            del self.start
 
     def start(self):
-        # XXX Check that the file system exists and give a helpful message if not
-        self.host.r.run([self.__script, self.fstype])
+        # Check that the file system exists.  We check the mount table
+        # instead of just the directory so we don't get tripped up by
+        # stale mount point directories.
+        mountCheck = self.path.rstrip("/")
+        for l in self.host.r.readFile("/proc/self/mounts").splitlines():
+            if l.split()[1].startswith(mountCheck):
+                break
+        else:
+            raise ValueError(
+                "No file system mounted at %s.  Did you run 'mkmounts %s' on %s?" %
+                (mountCheck, self.fstype, self.host))
+
+        # Clean
+        if self.clean:
+            self.host.r.run([self.__script, self.fstype])
 
 __all__.append("perfLocked")
 def perfLocked(host, cmdSsh, cmdSudo, cmdRun):
