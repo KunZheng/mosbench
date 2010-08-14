@@ -34,8 +34,7 @@ class Wrmem(Task, BenchmarkRunner):
 
         # Get result
         log = self.host.r.readFile(logPath)
-        results, units = parseResults(log)
-        return results[-1], units
+        return parseResults(log)[-1]
 
 __all__.append("parseResults")
 def parseResults(log):
@@ -51,10 +50,10 @@ def parseResults(log):
             if m:
                 real = float(m.group(1))
                 # Compute jobs/hour/core from ms/job
-                out.append((60*60*1000) / (real*cores))
+                out.append(((60*60*1000) / (real*cores), "jobs/hour/core"))
     if not out:
         raise ValueError("Failed to parse results log")
-    return out, "jobs/hour/core"
+    return out
 
 class Metis(object):
     def __str__(self):
