@@ -3,7 +3,7 @@ from mparts.host import HostInfo, CHECKED, UNCHECKED
 from mparts.util import Progress
 from support import BenchmarkRunner, SetCPUs, PrefetchList, FileSystem
 
-import os
+import os, re
 
 __all__ = []
 
@@ -54,9 +54,20 @@ class Mkdb(Task, BenchmarkRunner):
 
         # Get result
         log = self.host.r.readFile(logPath)
-        last = log.strip().splitlines()[-1]
-        last = last.split("throughput:", 1)[1].strip()
-        return float(last.split()[0]), last.split()[1]
+        # XXX Take the trial number so we can be sure to get the right result
+        return parseResults(log)[-1]
+
+__all__.append("parseResults")
+def parseResults(log):
+    out = []
+    tputRe = re.compile(r"[0-9]+:.*\bthroughput:\s*([0-9]+\.?[0-9]*)\s+(\S+)\s*$")
+    for line in log.splitlines():
+        m = tputRe.match(line)
+        if m:
+            out.append((float(m.group(1)), m.group(2)))
+    if not out:
+        raise ValueError("Failed to parse results log")
+    return out
 
 __all__.append("Mkfiles")
 class Mkfiles(Task):
