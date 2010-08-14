@@ -1,27 +1,27 @@
 from mparts.manager import Task
 from mparts.host import HostInfo, CHECKED
-from support import SetCPUs, FileSystem
+from support import BenchmarkRunner, SetCPUs, FileSystem
 
-import os
+import os, re
 
 __all__ = []
 
 __all__.append("Wrmem")
-class Wrmem(Task):
-    __config__ = ["host", "metisPath", "streamflow", "model", "cores"]
+class Wrmem(Task, BenchmarkRunner):
+    __config__ = ["host", "metisPath", "streamflow", "model"]
 
-    def __init__(self, host, metisPath, streamflow, model, cores):
+    def __init__(self, host, metisPath, streamflow, model, cores, trials):
         assert model in ["default", "hugetlb"], \
             "Unknown Metis memory model %r" % model
 
         Task.__init__(self, host = host)
+        BenchmarkRunner.__init__(self, cores, trials)
         self.host = host
         self.metisPath = metisPath
         self.streamflow = streamflow
         self.model = model
-        self.cores = cores
 
-    def wait(self):
+    def runTrial(self, m):
         obj = os.path.join(self.metisPath, "obj." + self.model)
         cmd = [os.path.join(obj, "app",
                             "wrmem" + (".sf" if self.streamflow else "")),
@@ -32,7 +32,29 @@ class Wrmem(Task):
         logPath = self.host.getLogPath(self)
         self.host.r.run(cmd, stdout = logPath, addEnv = addEnv, wait = CHECKED)
 
-        # XXX Get result
+        # Get result
+        log = self.host.r.readFile(logPath)
+        results, units = parseResults(log)
+        return results[-1], units
+
+__all__.append("parseResults")
+def parseResults(log):
+    out = []
+    coreRe = re.compile(r"Runtime in milliseconds \[([0-9]+) cores\]")
+    realRe = re.compile(r".*\bReal:\s*([0-9]+)\s*$")
+    for l in log.splitlines():
+        m = coreRe.match(l)
+        if m:
+            cores = int(m.group(1))
+        else:
+            m = realRe.match(l)
+            if m:
+                real = float(m.group(1))
+                # Compute jobs/hour/core from ms/job
+                out.append((60*60*1000) / (real*cores))
+    if not out:
+        raise ValueError("Failed to parse results log")
+    return out, "jobs/hour/core"
 
 class Metis(object):
     def __str__(self):
@@ -50,7 +72,8 @@ class Metis(object):
         metisPath = os.path.join(cfg.benchRoot, "metis")
         if cfg.hotplug:
             m += SetCPUs(host = host, num = cfg.cores)
-        m += Wrmem(host, metisPath, cfg.streamflow, cfg.model, cfg.cores)
+        m += Wrmem(host, metisPath, cfg.streamflow, cfg.model, cfg.cores,
+                   cfg.trials)
         # m += cfg.monitors
         m.run()
 
