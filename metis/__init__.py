@@ -21,7 +21,7 @@ class Wrmem(Task, BenchmarkRunner):
         self.streamflow = streamflow
         self.model = model
 
-    def runTrial(self, m):
+    def runTrial(self, m, trial):
         obj = os.path.join(self.metisPath, "obj." + self.model)
         cmd = [os.path.join(obj, "app",
                             "wrmem" + (".sf" if self.streamflow else "")),
@@ -34,7 +34,7 @@ class Wrmem(Task, BenchmarkRunner):
 
         # Get result
         log = self.host.r.readFile(logPath)
-        return parseResults(log)[-1]
+        return parseResults(log)[trial]
 
 __all__.append("parseResults")
 def parseResults(log):

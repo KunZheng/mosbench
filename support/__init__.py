@@ -29,7 +29,7 @@ class BenchmarkRunner(ResultsProvider):
         best = None
         for t in range(self.trials):
             self.log("Trial %d/%d" % (t+1, self.trials))
-            result, units = self.runTrial(m)
+            result, units = self.runTrial(m, t)
             self.log("=> %s %s" % (result, units))
             if best == None:
                 best = result, units
@@ -169,6 +169,7 @@ class FileSystem(Task, SourceFileProvider):
             del self.start
 
     def start(self):
+        # XXX Check that the file system exists and give a helpful message if not
         self.host.r.run([self.__script, self.fstype])
 
 __all__.append("perfLocked")

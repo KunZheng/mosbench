@@ -36,7 +36,7 @@ class Mkdb(Task, BenchmarkRunner):
         self.order = order
         self.mem = mem
 
-    def runTrial(self, m):
+    def runTrial(self, m, trial):
         # Construct command
         cmd = [os.path.join(self.psearchyPath, "mkdb", "pedsort"),
                "-t", self.dbPath,
@@ -54,8 +54,7 @@ class Mkdb(Task, BenchmarkRunner):
 
         # Get result
         log = self.host.r.readFile(logPath)
-        # XXX Take the trial number so we can be sure to get the right result
-        return parseResults(log)[-1]
+        return parseResults(log)[trial]
 
 __all__.append("parseResults")
 def parseResults(log):
