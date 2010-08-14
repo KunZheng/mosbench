@@ -265,7 +265,7 @@ mr_print_stats(void)
 	total_sample_time + total_map_time + total_reduce_time +
 	total_merge_time;
 #define SEP "\t"
-    printf("Runtime in millisecond [%d cores]\n\t",
+    printf("Runtime in milliseconds [%d cores]\n\t",
 	   mr_state.mr_fixed.nr_cpus);
     printf("Sample:\t%" PRIu64 SEP,
 	   total_sample_time * 1000 / get_cpu_freq());
