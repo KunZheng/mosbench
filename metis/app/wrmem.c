@@ -197,6 +197,7 @@ wr_usage(char *prog)
     printf("  -l ntops : # of top key/value pairs to display\n");
     printf("  -s inputsize : size of input in MB\n");
     printf("  -q : quiet output (for batch test)\n");
+    printf("  -f : only perform the single-threaded startup.\n");
     exit(EXIT_FAILURE);
 }
 
@@ -205,10 +206,10 @@ main(int argc, char *argv[])
 {
     affinity_set(0);
     final_data_kvs_len_t wr_val;
-    int nprocs = 0, map_tasks = 0, ndisp = 5, reduce_tasks = 0, quiet = 0;
+    int nprocs = 0, map_tasks = 0, ndisp = 5, reduce_tasks = 0, quiet = 0, fast = 0;
     uint64_t inputsize = 0x80000000;
     int c;
-    while ((c = getopt(argc, argv, "p:l:m:r:qs:")) != -1) {
+    while ((c = getopt(argc, argv, "p:l:m:r:qs:f")) != -1) {
 	switch (c) {
 	case 'p':
 	    nprocs = atoi(optarg);
@@ -228,6 +229,9 @@ main(int argc, char *argv[])
 	case 'q':
 	    quiet = 1;
 	    break;
+	case 'f':
+	    fast = 1;
+	    break;
 	default:
 	    wr_usage(argv[0]);
 	    exit(EXIT_FAILURE);
@@ -246,6 +250,8 @@ main(int argc, char *argv[])
 	fdata[pos++] = ' ';
     }
     memset(&fdata[pos], 0, inputsize - pos);
+    if (fast)
+	return 0;
     do_mapreduce(nprocs, map_tasks, reduce_tasks, fdata, inputsize, &wr_val);
     mr_print_stats();
     if (!quiet)
