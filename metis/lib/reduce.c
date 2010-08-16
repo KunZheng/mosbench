@@ -60,20 +60,28 @@ reduce_or_groupkvs(const pc_handler_t * pch, void **nodes, int n)
 	}
 	if (min_idx < 0)
 	    break;
-	// Merge all the values with the same mimimum key.
-	// Since keys may duplicate in each node, vlen
-	// is temporary.
+	// Merge all the values with the same minimum key.
+	// Since keys can not duplicate in each node, needed_len
+	// is final.
 	dst.key = kvs[min_idx].key;
 	// Eat up all the pairs with the same key
+	int needed_len = 0;
 	for (int i = 0; i < n; i++) {
 	    if (marks[i] != m)
 		continue;
-	    do {
-		values_mv(&dst, &kvs[i]);
-		ended[i] =
-		    pch->pch_iter_next_kvs(nodes[i], &kvs[i], iters[i], 1);
-	    }
-	    while (!ended[i] && keycmp(dst.key, kvs[i].key) == 0);
+	    needed_len += kvs[i].len;
+	}
+	if (dst.alloc_len < needed_len) {
+	    if (dst.alloc_len)
+	        free(dst.vals);
+	    dst.vals = (void **)malloc(sizeof(void *) * needed_len);
+	    dst.alloc_len = needed_len;
+	}
+	for (int i = 0; i < n; i++) {
+	    if (marks[i] != m)
+		continue;
+	    values_mv(&dst, &kvs[i]);
+	    ended[i] = pch->pch_iter_next_kvs(nodes[i], &kvs[i], iters[i], 1);
 	}
 	if (the_app.atype == atype_mapreduce) {
 	    if (the_app.mapreduce.vm) {
