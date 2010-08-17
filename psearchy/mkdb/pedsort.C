@@ -437,6 +437,11 @@ main(int argc, char *argv[])
 
   // printf("max_did: %lld\n", max_did);
 
+  // Kick the monitor runner, if present
+  char path[128];
+  snprintf(path, sizeof path, "/tmp/mon-runner-%d", getuid());
+  write(open(path, O_WRONLY|O_NONBLOCK), "x", 1);
+
   initshared();
   if (threaded) {
     pthread_t *tha = new pthread_t[ncore];

@@ -8,9 +8,9 @@ import sys, os, socket, select, signal, subprocess, errno
 def usage():
     print >> sys.stderr, """Usage: %s cmd...
 
-Starts the specified command when the first connection to the control FIFO
-or socket is established and sends the child process a SIGINT when the last
-connection closes.
+Runs the specified command while there are connections to the control
+FIFO or socket.  When the last connection closes, this sends the child
+process a SIGINT.
 
 To start monitoring using the control FIFO from Python:
     try:
@@ -26,7 +26,7 @@ Make sure sock doesn't go out of scope.
 To use the control FIFO from C:
     char path[128];
     snprintf(path, sizeof path, "%s%%d", getuid());
-    write(open(path, O_WRONLY|O_NONBLOCK), "x", 1)
+    write(open(path, O_WRONLY|O_NONBLOCK), "x", 1);
 """ % (sys.argv[0], FIFO_BASE_PATH, IP_BASE_PORT, FIFO_BASE_PATH)
     sys.exit(2)
 
@@ -72,6 +72,8 @@ def loop(fifo, sock):
     masters = [fifo, sock]
     clients = []
 
+    print "# mon-runner ready"
+    sys.stdout.flush()
     while clients or not proc:
         rset, _, _ = select.select(masters + clients, [], [])
         for fp in rset:
@@ -102,5 +104,7 @@ if __name__ == "__main__":
         usage()
     try:
         loop(*makeMasters())
+    except KeyboardInterrupt:
+        pass
     finally:
         kill()

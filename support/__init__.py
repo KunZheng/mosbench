@@ -1,4 +1,4 @@
-import sys, os
+import sys, os, signal, time
 
 from mparts.manager import Task
 from mparts.host import *
@@ -182,6 +182,57 @@ class FileSystem(Task, SourceFileProvider):
         # Clean
         if self.clean:
             self.host.r.run([self.__script, self.fstype])
+
+def waitForLog(host, logPath, name, secs, string):
+    for retry in range(secs*2):
+        log = host.r.readFile(logPath)
+        if string in log:
+            return
+        time.sleep(0.5)
+    raise RuntimeError("Timeout waiting for %s to start" % name)
+
+class TimesProvider(object):
+    pass
+
+__all__.append("MonitorTimes")
+class MonitorTimes(Task, SourceFileProvider, TimesProvider):
+    __config__ = ["host", "*times"]
+
+    def __init__(self, host):
+        Task.__init__(self, host = host)
+        self.host = host
+        self.__runner = self.queueSrcFile(host, "mon-runner")
+        self.__script = self.queueSrcFile(host, "mon-times")
+
+    def start(self):
+        # XXX Crud, we have to deal with multiple trials.  Perhaps the
+        # mon-runner should just keep running and restart the monitor
+        # when a new connection comes in.
+        #
+        # XXX Use # before runner output.  Also use this to
+        # distinguish trials.
+        #
+        # XXX This and the BenchmarkRunner should probably just record
+        # all of the trials and leave it up to the reporter to join
+        # all of this information and pick the best throughput.
+        logPath = self.host.getLogPath(self)
+        self.__p = self.host.r.run([self.__runner, self.__script],
+                                   stdout = logPath, wait = False)
+        waitForLog(self.host, logPath, "mon-runner", 5, "mon-runner ready")
+
+    def stop(self):
+        self.__p.kill(signal.SIGINT)
+        self.__p.wait()
+        logPath = self.host.getLogPath(self)
+        log = self.host.r.readFile(logPath).split("\n", 1)[1]
+        times = {}
+        for l in log.splitlines():
+            name, val = l.split()
+            times[name] = float(val)
+        if not times:
+            raise RuntimeError(
+                "Benchmark did not start or did not stop monitor")
+        self.times = times
 
 __all__.append("perfLocked")
 def perfLocked(host, cmdSsh, cmdSudo, cmdRun):

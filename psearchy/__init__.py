@@ -2,6 +2,8 @@ from mparts.manager import Task
 from mparts.host import HostInfo, CHECKED, UNCHECKED
 from mparts.util import Progress
 from support import BenchmarkRunner, SetCPUs, PrefetchList, FileSystem
+# XXX
+from support import MonitorTimes
 
 import os, re
 
@@ -53,6 +55,9 @@ class Mkdb(Task, BenchmarkRunner):
                         wait = CHECKED)
 
         # Get result
+        # XXX Best-of won't work here; we need to pick the best time
+#        return 1, "jobs"
+        # XXX
         log = self.host.r.readFile(logPath)
         return parseResults(log)[trial]
 
@@ -114,6 +119,8 @@ class Psearchy(object):
             m += SetCPUs(host = host, num = cfg.cores, seq = cfg.order)
         m += Mkdb(host, psearchyPath, files.filesPath, fs.path,
                   cfg.cores, cfg.mode, cfg.order, cfg.mem, cfg.trials)
+        # XXX
+        m += MonitorTimes(host)
         # m += cfg.monitors
         m.run()
 
