@@ -33,7 +33,7 @@ To use the control FIFO from C:
 def makeMasters():
     fifoPath = "%s%d" % (FIFO_BASE_PATH, os.getuid())
     try:
-        os.mkfifo(fifoPath, 0666)
+        os.mkfifo(fifoPath)
     except EnvironmentError, e:
         if e.errno != errno.EEXIST:
             raise
