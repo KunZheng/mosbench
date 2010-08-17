@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
-FIFO_PATH = "/tmp/mon-runner-fifo"
-IP_PORT = 23584
+FIFO_BASE_PATH = "/tmp/mon-runner-"
+IP_BASE_PORT = 23584
 
 import sys, os, socket, select, signal, subprocess, errno
 
@@ -14,31 +14,34 @@ connection closes.
 
 To start monitoring using the control FIFO from Python:
     try:
-        os.write(os.open(%r, os.O_WRONLY|os.O_NONBLOCK), "x")
+        os.write(os.open("%s%%d" %% os.getuid(), os.O_WRONLY|os.O_NONBLOCK), "x")
     except EnvironmentError: pass
 
 To use the control socket from Python:
     try:
-        sock = socket.create_connection((\"hostname\", %d))
+        sock = socket.create_connection(("hostname", %d+os.getuid()%%10000))
     except socket.error: pass
 Make sure sock doesn't go out of scope.
 
 To use the control FIFO from C:
-    write(open(%r, O_WRONLY|O_NONBLOCK), "x", 1)
-""" % (sys.argv[0], FIFO_PATH, IP_PORT, FIFO_PATH)
+    char path[128];
+    snprintf(path, sizeof path, "%s%%d", getuid());
+    write(open(path, O_WRONLY|O_NONBLOCK), "x", 1)
+""" % (sys.argv[0], FIFO_BASE_PATH, IP_BASE_PORT, FIFO_BASE_PATH)
     sys.exit(2)
 
 def makeMasters():
+    fifoPath = "%s%d" % (FIFO_BASE_PATH, os.getuid())
     try:
-        os.mkfifo(FIFO_PATH)
+        os.mkfifo(fifoPath, 0666)
     except EnvironmentError, e:
         if e.errno != errno.EEXIST:
             raise
-    fifo = os.open(FIFO_PATH, os.O_RDONLY|os.O_NONBLOCK)
+    fifo = os.open(fifoPath, os.O_RDONLY|os.O_NONBLOCK)
 
     sock = socket.socket(socket.AF_INET)
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    sock.bind(("", IP_PORT))
+    sock.bind(("", IP_BASE_PORT + os.getpid() % 10000))
     sock.listen(5)
 
     return fifo, sock
