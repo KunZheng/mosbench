@@ -1,0 +1,103 @@
+#!/usr/bin/python
+
+FIFO_PATH = "/tmp/mon-runner-fifo"
+IP_PORT = 23584
+
+import sys, os, socket, select, signal, subprocess, errno
+
+def usage():
+    print >> sys.stderr, """Usage: %s cmd...
+
+Starts the specified command when the first connection to the control FIFO
+or socket is established and sends the child process a SIGINT when the last
+connection closes.
+
+To start monitoring using the control FIFO from Python:
+    try:
+        os.write(os.open(%r, os.O_WRONLY|os.O_NONBLOCK), "x")
+    except EnvironmentError: pass
+
+To use the control socket from Python:
+    try:
+        sock = socket.create_connection((\"hostname\", %d))
+    except socket.error: pass
+Make sure sock doesn't go out of scope.
+
+To use the control FIFO from C:
+    write(open(%r, O_WRONLY|O_NONBLOCK), "x", 1)
+""" % (sys.argv[0], FIFO_PATH, IP_PORT, FIFO_PATH)
+    sys.exit(2)
+
+def makeMasters():
+    try:
+        os.mkfifo(FIFO_PATH)
+    except EnvironmentError, e:
+        if e.errno != errno.EEXIST:
+            raise
+    fifo = os.open(FIFO_PATH, os.O_RDONLY|os.O_NONBLOCK)
+
+    sock = socket.socket(socket.AF_INET)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind(("", IP_PORT))
+    sock.listen(5)
+
+    return fifo, sock
+
+proc = None
+
+def start():
+    global proc
+    proc = subprocess.Popen(sys.argv[1:], close_fds = True)
+
+def stop():
+    global proc
+    os.kill(proc.pid, signal.SIGINT)
+    status = proc.wait()
+    proc = None
+    if status < 0:
+        os.kill(os.getpid(), -status)
+    else:
+        sys.exit(status)
+
+def kill():
+    global proc
+    if proc:
+        os.kill(proc.pid, signal.SIGKILL)
+        proc = None
+
+def loop(fifo, sock):
+    masters = [fifo, sock]
+    clients = []
+
+    while clients or not proc:
+        rset, _, _ = select.select(masters + clients, [], [])
+        for fp in rset:
+            if fp == fifo:
+                x = os.read(fp, 1)
+                if len(x) == 0:
+                    # When the last writer closes the FIFO, we read an EOF.
+                    os.close(fp)
+                    clients.remove(fp)
+                else:
+                    # Somebody opened the FIFO and wrote a hello byte.
+                    if fp not in clients:
+                        masters.remove(fp)
+                        clients.append(fp)
+            elif fp == sock:
+                client, _ = fp.accept()
+                clients.append(client)
+            else:
+                clients.remove(fp)
+
+            if clients and not proc:
+                start()
+
+    stop()
+
+if __name__ == "__main__":
+    if len(sys.argv) == 1:
+        usage()
+    try:
+        loop(*makeMasters())
+    finally:
+        kill()
