@@ -1,27 +1,28 @@
 from mparts.manager import Task
 from mparts.host import HostInfo, CHECKED
-from support import BenchmarkRunner, SetCPUs, FileSystem
+from support import ResultsProvider, SetCPUs, FileSystem
 
 import os, re
 
 __all__ = []
 
 __all__.append("Wrmem")
-class Wrmem(Task, BenchmarkRunner):
-    __config__ = ["host", "metisPath", "streamflow", "model"]
+class Wrmem(Task, ResultsProvider):
+    __config__ = ["host", "metisPath", "streamflow", "model", "trial"]
 
-    def __init__(self, host, metisPath, streamflow, model, cores, trials):
+    def __init__(self, host, trial, metisPath, streamflow, model, cores):
         assert model in ["default", "hugetlb"], \
             "Unknown Metis memory model %r" % model
 
-        Task.__init__(self, host = host)
-        BenchmarkRunner.__init__(self, cores, trials)
+        Task.__init__(self, host = host, trial = trial)
+        ResultsProvider.__init__(self, cores)
         self.host = host
+        self.trial = trial
         self.metisPath = metisPath
         self.streamflow = streamflow
         self.model = model
 
-    def runTrial(self, m, trial):
+    def wait(self, m):
         obj = os.path.join(self.metisPath, "obj." + self.model)
         cmd = [os.path.join(obj, "app",
                             "wrmem" + (".sf" if self.streamflow else "")),
@@ -34,7 +35,7 @@ class Wrmem(Task, BenchmarkRunner):
 
         # Get result
         log = self.host.r.readFile(logPath)
-        return parseResults(log)[trial]
+        self.setResults(*parseResults(log))
 
 __all__.append("parseResults")
 def parseResults(log):
@@ -53,7 +54,9 @@ def parseResults(log):
                 out.append(((60*60*1000) / (real*cores), "jobs/hour/core"))
     if not out:
         raise ValueError("Failed to parse results log")
-    return out
+    if len(out) > 1:
+        raise ValueError("Multiple results found in results log")
+    return out[0]
 
 class Metis(object):
     def __str__(self):
@@ -71,8 +74,9 @@ class Metis(object):
         metisPath = os.path.join(cfg.benchRoot, "metis")
         if cfg.hotplug:
             m += SetCPUs(host = host, num = cfg.cores)
-        m += Wrmem(host, metisPath, cfg.streamflow, cfg.model, cfg.cores,
-                   cfg.trials)
+        for trial in range(cfg.trials):
+            m += Wrmem(host, trial, metisPath, cfg.streamflow, cfg.model,
+                       cfg.cores)
         # m += cfg.monitors
         m.run()
 

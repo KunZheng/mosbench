@@ -13,31 +13,9 @@ class ResultsProvider(object):
         self.cores = cores
 
     def setResults(self, result, units):
+        self.log("=> %s %s" % (result, units))
         self.result = result
         self.units = units
-
-__all__.append("BenchmarkRunner")
-class BenchmarkRunner(ResultsProvider):
-    __config__ = ["trials"]
-
-    def __init__(self, cores, trials):
-        ResultsProvider.__init__(self, cores)
-        self.trials = trials
-        assert hasattr(self, "runTrial")
-
-    def wait(self, m):
-        best = None
-        for t in range(self.trials):
-            self.log("Trial %d/%d" % (t+1, self.trials))
-            result, units = self.runTrial(m, t)
-            self.log("=> %s %s" % (result, units))
-            if best == None:
-                best = result, units
-            else:
-                if units != best[1]:
-                    raise ValueError("Units changed between trials")
-                best = (max(best[0], result), units)
-        self.setResults(*best)
 
 __all__.append("IXGBE")
 class IXGBE(Task, SourceFileProvider):
@@ -191,22 +169,19 @@ def waitForLog(host, logPath, name, secs, string):
         time.sleep(0.5)
     raise RuntimeError("Timeout waiting for %s to start" % name)
 
-class TimesProvider(object):
+__all__.append("SysmonProvider")
+class SysmonProvider(object):
     pass
 
 # XXX Perhaps this shouldn't be a task at all.  It has to send a
-# source file, but doesn't have any life-cycle.  It might be more
-# natural to record the results in the benchmark that's running this,
-# especially if I wind up creating a copy of the benchmark runner for
-# each trial.
+# source file, but doesn't have any life-cycle.
 __all__.append("SystemMonitor")
-class SystemMonitor(Task, SourceFileProvider, TimesProvider):
-    __config__ = ["host", "times"]
+class SystemMonitor(Task, SourceFileProvider):
+    __config__ = ["host"]
 
     def __init__(self, host):
         Task.__init__(self, host = host)
         self.host = host
-        self.times = []
         self.__script = self.queueSrcFile(host, "sysmon")
 
     def wrap(self, cmd, match = None):
@@ -222,10 +197,11 @@ class SystemMonitor(Task, SourceFileProvider, TimesProvider):
             raise ValueError("Multiple sysmon reports found in log file")
 
         parts = mine[0].split()[1:]
-        self.times.append({})
+        res = {}
         while parts:
             k, v = parts.pop(0), parts.pop(0)
-            self.times[-1][k] = float(v)
+            res["time." + k] = float(v)
+        return res
 
 __all__.append("perfLocked")
 def perfLocked(host, cmdSsh, cmdSudo, cmdRun):

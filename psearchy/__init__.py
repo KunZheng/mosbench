@@ -1,16 +1,16 @@
 from mparts.manager import Task
 from mparts.host import HostInfo, CHECKED, UNCHECKED
 from mparts.util import Progress
-from support import BenchmarkRunner, SetCPUs, PrefetchList, FileSystem
+from support import ResultsProvider, SetCPUs, PrefetchList, FileSystem
 # XXX
-from support import SystemMonitor
+from support import SystemMonitor, SysmonProvider
 
 import os, re
 
 __all__ = []
 
 __all__.append("Mkdb")
-class Mkdb(Task, BenchmarkRunner):
+class Mkdb(Task, ResultsProvider, SysmonProvider):
     MODE_THREAD = intern("thread")
     MODE_PROCESS = intern("process")
 
@@ -18,28 +18,29 @@ class Mkdb(Task, BenchmarkRunner):
     ORDER_RR = intern("rr")
 
     __config__ = ["host", "psearchyPath", "filesPath", "dbPath",
-                  "mode", "order", "mem"]
+                  "mode", "order", "mem", "trial", "*sysmonOut"]
 
-    def __init__(self, host, psearchyPath, filesPath, dbPath, cores,
+    def __init__(self, host, trial, psearchyPath, filesPath, dbPath, cores,
                  mode = MODE_THREAD, order = ORDER_SEQ,
-                 mem = 256, trials = 3, monitor = None):
+                 mem = 256, sysmon = None):
         assert mode in [Mkdb.MODE_THREAD, Mkdb.MODE_PROCESS], \
             "Invalid mode %s" % mode
         assert order in [Mkdb.ORDER_SEQ, Mkdb.ORDER_RR], \
             "Invalid order %s" % order
 
-        Task.__init__(self, host = host)
-        BenchmarkRunner.__init__(self, cores, trials)
+        Task.__init__(self, host = host, trial = trial)
+        ResultsProvider.__init__(self, cores)
         self.host = host
+        self.trial = trial
         self.psearchyPath = psearchyPath
         self.filesPath = filesPath
         self.dbPath = dbPath
         self.mode = mode
         self.order = order
         self.mem = mem
-        self.monitor = monitor
+        self.sysmon = sysmon
 
-    def runTrial(self, m, trial):
+    def wait(self, m):
         # Construct command
         cmd = [os.path.join(self.psearchyPath, "mkdb", "pedsort"),
                "-t", self.dbPath,
@@ -49,12 +50,11 @@ class Mkdb(Task, BenchmarkRunner):
             cmd.append("-p")
         if self.order == Mkdb.ORDER_RR:
             cmd.extend(["-s", "1"])
-        if self.monitor:
-            # XXX For the submission, we measured the entire time,
-            # including file list loading.  That may be a more natural
-            # definition of "job" even though the file list loading is
-            # sequential.
-            cmd = self.monitor.wrap(cmd, "Building index")
+        # XXX For the submission, we measured the entire time,
+        # including file list loading.  That may be a more natural
+        # definition of "job" even though the file list loading is
+        # sequential.
+        cmd = self.sysmon.wrap(cmd, "Building index")
 
         # Run
         logPath = self.host.getLogPath(self)
@@ -65,9 +65,8 @@ class Mkdb(Task, BenchmarkRunner):
         # XXX Best-of won't work here; we need to pick the best time
 #        return 1, "jobs"
         log = self.host.r.readFile(logPath)
-        if self.monitor:
-            self.monitor.parseLog(log)
-        return parseResults(log)[trial]
+        self.sysmonOut = self.sysmon.parseLog(log)
+        self.setResults(*parseResults(log))
 
 __all__.append("parseResults")
 def parseResults(log):
@@ -79,7 +78,9 @@ def parseResults(log):
             out.append((float(m.group(1)), m.group(2)))
     if not out:
         raise ValueError("Failed to parse results log")
-    return out
+    if len(out) > 1:
+        raise ValueError("Multiple results found in results log")
+    return out[0]
 
 __all__.append("Mkfiles")
 class Mkfiles(Task):
@@ -127,9 +128,10 @@ class Psearchy(object):
             m += SetCPUs(host = host, num = cfg.cores, seq = cfg.order)
         sysmon = SystemMonitor(host)
         m += sysmon
-        m += Mkdb(host, psearchyPath, files.filesPath, fs.path,
-                  cfg.cores, cfg.mode, cfg.order, cfg.mem, cfg.trials,
-                  monitor = sysmon)
+        for trial in range(cfg.trials):
+            m += Mkdb(host, trial, psearchyPath, files.filesPath, fs.path,
+                      cfg.cores, cfg.mode, cfg.order, cfg.mem,
+                      sysmon = sysmon)
         # XXX
         # m += cfg.monitors
         m.run()
