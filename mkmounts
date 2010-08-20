@@ -25,6 +25,11 @@ EOF
     exit 2
 }
 
+if [ $UID != 0 ]; then
+    echo "Must be run as root" >&2
+    exit 2
+fi
+
 # Unmount?
 UNMOUNT=
 if [ "$1" = -u ]; then
