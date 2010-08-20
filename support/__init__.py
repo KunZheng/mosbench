@@ -194,45 +194,38 @@ def waitForLog(host, logPath, name, secs, string):
 class TimesProvider(object):
     pass
 
-__all__.append("MonitorTimes")
-class MonitorTimes(Task, SourceFileProvider, TimesProvider):
-    __config__ = ["host", "*times"]
+# XXX Perhaps this shouldn't be a task at all.  It has to send a
+# source file, but doesn't have any life-cycle.  It might be more
+# natural to record the results in the benchmark that's running this,
+# especially if I wind up creating a copy of the benchmark runner for
+# each trial.
+__all__.append("SystemMonitor")
+class SystemMonitor(Task, SourceFileProvider, TimesProvider):
+    __config__ = ["host", "times"]
 
     def __init__(self, host):
         Task.__init__(self, host = host)
         self.host = host
-        self.__runner = self.queueSrcFile(host, "mon-runner")
-        self.__script = self.queueSrcFile(host, "mon-times")
+        self.times = []
+        self.__script = self.queueSrcFile(host, "sysmon")
 
-    def start(self):
-        # XXX Crud, we have to deal with multiple trials.  Perhaps the
-        # mon-runner should just keep running and restart the monitor
-        # when a new connection comes in.
-        #
-        # XXX Use # before runner output.  Also use this to
-        # distinguish trials.
-        #
-        # XXX This and the BenchmarkRunner should probably just record
-        # all of the trials and leave it up to the reporter to join
-        # all of this information and pick the best throughput.
-        logPath = self.host.getLogPath(self)
-        self.__p = self.host.r.run([self.__runner, self.__script],
-                                   stdout = logPath, wait = False)
-        waitForLog(self.host, logPath, "mon-runner", 5, "mon-runner ready")
+    def wrap(self, cmd, match = None):
+        if match != None:
+            return [self.__script, "-m", match] + cmd
+        return [self.__script] + cmd
 
-    def stop(self):
-        self.__p.kill(signal.SIGINT)
-        self.__p.wait()
-        logPath = self.host.getLogPath(self)
-        log = self.host.r.readFile(logPath).split("\n", 1)[1]
-        times = {}
-        for l in log.splitlines():
-            name, val = l.split()
-            times[name] = float(val)
-        if not times:
-            raise RuntimeError(
-                "Benchmark did not start or did not stop monitor")
-        self.times = times
+    def parseLog(self, log):
+        mine = [l for l in log.splitlines() if l.startswith("[TimeMonitor] ")]
+        if len(mine) == 0:
+            raise ValueError("No sysmon report found in log file")
+        if len(mine) > 1:
+            raise ValueError("Multiple sysmon reports found in log file")
+
+        parts = mine[0].split()[1:]
+        self.times.append({})
+        while parts:
+            k, v = parts.pop(0), parts.pop(0)
+            self.times[-1][k] = float(v)
 
 __all__.append("perfLocked")
 def perfLocked(host, cmdSsh, cmdSudo, cmdRun):

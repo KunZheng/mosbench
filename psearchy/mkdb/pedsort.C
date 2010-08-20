@@ -437,10 +437,8 @@ main(int argc, char *argv[])
 
   // printf("max_did: %lld\n", max_did);
 
-  // Kick the monitor runner, if present
-  char path[128];
-  snprintf(path, sizeof path, "/tmp/mon-runner-%d", getuid());
-  write(open(path, O_WRONLY|O_NONBLOCK), "x", 1);
+  printf("Building index\n");
+  fflush(stdout);
 
   initshared();
   if (threaded) {

@@ -3,7 +3,7 @@ from mparts.host import HostInfo, CHECKED, UNCHECKED
 from mparts.util import Progress
 from support import BenchmarkRunner, SetCPUs, PrefetchList, FileSystem
 # XXX
-from support import MonitorTimes
+from support import SystemMonitor
 
 import os, re
 
@@ -22,7 +22,7 @@ class Mkdb(Task, BenchmarkRunner):
 
     def __init__(self, host, psearchyPath, filesPath, dbPath, cores,
                  mode = MODE_THREAD, order = ORDER_SEQ,
-                 mem = 256, trials = 3):
+                 mem = 256, trials = 3, monitor = None):
         assert mode in [Mkdb.MODE_THREAD, Mkdb.MODE_PROCESS], \
             "Invalid mode %s" % mode
         assert order in [Mkdb.ORDER_SEQ, Mkdb.ORDER_RR], \
@@ -37,6 +37,7 @@ class Mkdb(Task, BenchmarkRunner):
         self.mode = mode
         self.order = order
         self.mem = mem
+        self.monitor = monitor
 
     def runTrial(self, m, trial):
         # Construct command
@@ -48,6 +49,12 @@ class Mkdb(Task, BenchmarkRunner):
             cmd.append("-p")
         if self.order == Mkdb.ORDER_RR:
             cmd.extend(["-s", "1"])
+        if self.monitor:
+            # XXX For the submission, we measured the entire time,
+            # including file list loading.  That may be a more natural
+            # definition of "job" even though the file list loading is
+            # sequential.
+            cmd = self.monitor.wrap(cmd, "Building index")
 
         # Run
         logPath = self.host.getLogPath(self)
@@ -57,8 +64,9 @@ class Mkdb(Task, BenchmarkRunner):
         # Get result
         # XXX Best-of won't work here; we need to pick the best time
 #        return 1, "jobs"
-        # XXX
         log = self.host.r.readFile(logPath)
+        if self.monitor:
+            self.monitor.parseLog(log)
         return parseResults(log)[trial]
 
 __all__.append("parseResults")
@@ -117,10 +125,12 @@ class Psearchy(object):
         m += PrefetchList(host, files.filesPath, reuse = True)
         if cfg.hotplug:
             m += SetCPUs(host = host, num = cfg.cores, seq = cfg.order)
+        sysmon = SystemMonitor(host)
+        m += sysmon
         m += Mkdb(host, psearchyPath, files.filesPath, fs.path,
-                  cfg.cores, cfg.mode, cfg.order, cfg.mem, cfg.trials)
+                  cfg.cores, cfg.mode, cfg.order, cfg.mem, cfg.trials,
+                  monitor = sysmon)
         # XXX
-        m += MonitorTimes(host)
         # m += cfg.monitors
         m.run()
 
