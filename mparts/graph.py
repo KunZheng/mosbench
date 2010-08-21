@@ -19,13 +19,15 @@ def mkGenSetter(prop):
     return property(fset = setter)
 
 class Gnuplot(object):
-    __slots__ = ["__g", "__cmds", "__plot"]
+    __slots__ = ["__g", "__cmds", "__plot", "__dataFile", "__dataIndex"]
 
     def __init__(self):
         self.__g = subprocess.Popen(["gnuplot", "--persist"],
                                     stdin = subprocess.PIPE)
         self.__cmds = []
         self.__plot = []
+        self.__dataFile = None
+        self.__dataIndex = 0
 
     def __call__(self, cmd):
         self.__cmds.append(cmd)
@@ -48,13 +50,21 @@ class Gnuplot(object):
 
     def addData(self, data, axis = None, title = None, with_ = None,
                 linecolor = None, pointtype = None):
-        # We intentionally leave these temp files around because
-        # Gnuplot re-reads them whenever we zoom the graph.
-        fd, path = tempfile.mkstemp(prefix = "gnuplot")
-        f = os.fdopen(fd, "w")
+        if self.__dataFile == None:
+            # We intentionally leave these temp files around because
+            # Gnuplot re-reads them whenever we zoom the graph.
+            fd, path = tempfile.mkstemp(prefix = "gnuplot")
+            f = os.fdopen(fd, "w")
+            self.__dataFile = (f, path)
+        else:
+            f, path = self.__dataFile
+
         for tup in data:
             print >> f, "\t".join(map(str, tup))
-        cmd = "%r" % path
+        print >> f
+        print >> f
+        cmd = "%r index %d" % (path, self.__dataIndex)
+        self.__dataIndex += 1
 
         if with_ == None and (linecolor != None or pointtype != None):
             with_ = "points"
@@ -74,6 +84,8 @@ class Gnuplot(object):
     def plot(self):
         if not len(self.__plot):
             raise ValueError("Nothing to plot")
+        self.__dataFile = None
+        self.__dataIndex = 0
         self("plot " + ", ".join(self.__plot))
         self.__flush()
         self.__plot[:] = []
