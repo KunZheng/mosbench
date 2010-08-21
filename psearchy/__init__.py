@@ -62,25 +62,9 @@ class Mkdb(Task, ResultsProvider, SysmonProvider):
                         wait = CHECKED)
 
         # Get result
-        # XXX Best-of won't work here; we need to pick the best time
-#        return 1, "jobs"
         log = self.host.r.readFile(logPath)
         self.sysmonOut = self.sysmon.parseLog(log)
-        self.setResults(*parseResults(log))
-
-__all__.append("parseResults")
-def parseResults(log):
-    out = []
-    tputRe = re.compile(r"[0-9]+:.*\bthroughput:\s*([0-9]+\.?[0-9]*)\s+(\S+)\s*$")
-    for line in log.splitlines():
-        m = tputRe.match(line)
-        if m:
-            out.append((float(m.group(1)), m.group(2)))
-    if not out:
-        raise ValueError("Failed to parse results log")
-    if len(out) > 1:
-        raise ValueError("Multiple results found in results log")
-    return out[0]
+        self.setResults(1, "job", "jobs", self.sysmonOut["time.real"])
 
 __all__.append("Mkfiles")
 class Mkfiles(Task):

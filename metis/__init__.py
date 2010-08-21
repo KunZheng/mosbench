@@ -35,23 +35,17 @@ class Wrmem(Task, ResultsProvider):
 
         # Get result
         log = self.host.r.readFile(logPath)
-        self.setResults(*parseResults(log))
+        # XXX Use sysmon to get real time
+        self.setResults(1, "job", "jobs", parseResults(log))
 
 __all__.append("parseResults")
 def parseResults(log):
     out = []
-    coreRe = re.compile(r"Runtime in milliseconds \[([0-9]+) cores\]")
     realRe = re.compile(r".*\bReal:\s*([0-9]+)\s*$")
     for l in log.splitlines():
-        m = coreRe.match(l)
+        m = realRe.match(l)
         if m:
-            cores = int(m.group(1))
-        else:
-            m = realRe.match(l)
-            if m:
-                real = float(m.group(1))
-                # Compute jobs/hour/core from ms/job
-                out.append(((60*60*1000) / (real*cores), "jobs/hour/core"))
+            out.append(float(m.group(1))/1000)
     if not out:
         raise ValueError("Failed to parse results log")
     if len(out) > 1:
@@ -64,7 +58,7 @@ class Metis(object):
 
     @staticmethod
     def run(m, cfg):
-        # XXX Clean hugetlb directories
+        # XXX Clean hugetlb directories between trials?
         host = cfg.primaryHost
         m += host
         m += HostInfo(host)

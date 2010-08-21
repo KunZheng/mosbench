@@ -7,15 +7,18 @@ __all__ = []
 
 __all__.append("ResultsProvider")
 class ResultsProvider(object):
-    __config__ = ["cores", "result", "units"]
+    __config__ = ["cores", "result", "unit", "units", "real"]
 
     def __init__(self, cores):
         self.cores = cores
 
-    def setResults(self, result, units):
-        self.log("=> %s %s" % (result, units))
-        self.result = result
+    def setResults(self, result, unit, units, real):
+        self.log("=> %g %s (%g secs, %g %s/sec/core)" %
+                 (result, units, real, float(result)/real/self.cores, units))
+        self.result = float(result)
+        self.unit = unit
         self.units = units
+        self.real = real
 
 __all__.append("IXGBE")
 class IXGBE(Task, SourceFileProvider):
