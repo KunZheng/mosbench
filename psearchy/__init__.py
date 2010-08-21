@@ -1,16 +1,15 @@
 from mparts.manager import Task
 from mparts.host import HostInfo, CHECKED, UNCHECKED
 from mparts.util import Progress
-from support import ResultsProvider, SetCPUs, PrefetchList, FileSystem
-# XXX
-from support import SystemMonitor, SysmonProvider
+from support import ResultsProvider, SetCPUs, PrefetchList, FileSystem, \
+    SystemMonitor
 
 import os, re
 
 __all__ = []
 
 __all__.append("Mkdb")
-class Mkdb(Task, ResultsProvider, SysmonProvider):
+class Mkdb(Task, ResultsProvider):
     MODE_THREAD = intern("thread")
     MODE_PROCESS = intern("process")
 

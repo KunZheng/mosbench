@@ -7,12 +7,26 @@ __all__ = []
 
 __all__.append("ResultsProvider")
 class ResultsProvider(object):
+    """A ResultsProvider is a marker interface searched for by the
+    MOSBENCH analysis tools.  Every benchmark trial should produce one
+    ResultsProvider object.  This records the number of cores, the
+    number of units of work done, what those units are, and how long
+    it took to do that work.  In addition, if the benchmark is using
+    SystemMonitor, the analysis tools expect to find its logs results
+    in the ResultsProvider subclass."""
+
     __config__ = ["cores", "result", "unit", "units", "real"]
 
     def __init__(self, cores):
         self.cores = cores
 
     def setResults(self, result, unit, units, real):
+        """Set the results of this object.  result is the number of
+        work units completed.  For job-oriented benchmarks, this
+        should generally be 1.  unit and units are the name of a unit
+        of work, in singular and plural form.  real is the number of
+        seconds of real time elapsed while performing this work."""
+
         self.log("=> %g %s (%g secs, %g %s/sec/core)" %
                  (result, units, real, float(result)/real/self.cores, units))
         self.result = float(result)
@@ -172,10 +186,6 @@ def waitForLog(host, logPath, name, secs, string):
         time.sleep(0.5)
     raise RuntimeError("Timeout waiting for %s to start" % name)
 
-__all__.append("SysmonProvider")
-class SysmonProvider(object):
-    pass
-
 # XXX Perhaps this shouldn't be a task at all.  It has to send a
 # source file, but doesn't have any life-cycle.
 __all__.append("SystemMonitor")
@@ -193,6 +203,10 @@ class SystemMonitor(Task, SourceFileProvider):
         return [self.__script] + cmd
 
     def parseLog(self, log):
+        """Parse a log produced by a sysmon-wrapped command, returning
+        a dictionary of configuration values that should be
+        incorporated into the calling object's configuration."""
+
         mine = [l for l in log.splitlines() if l.startswith("[TimeMonitor] ")]
         if len(mine) == 0:
             raise ValueError("No sysmon report found in log file")
