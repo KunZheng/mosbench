@@ -197,10 +197,14 @@ class SystemMonitor(Task, SourceFileProvider):
         self.host = host
         self.__script = self.queueSrcFile(host, "sysmon")
 
-    def wrap(self, cmd, match = None):
-        if match != None:
-            return [self.__script, "-m", match] + cmd
-        return [self.__script] + cmd
+    def wrap(self, cmd, start = None, end = None):
+        out = [self.__script]
+        if start != None:
+            out.extend(["-s", start])
+        if end != None:
+            out.extend(["-e", end])
+        out.extend(cmd)
+        return out
 
     def parseLog(self, log):
         """Parse a log produced by a sysmon-wrapped command, returning
