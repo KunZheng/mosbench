@@ -1,6 +1,6 @@
 from mparts.manager import Task
 from mparts.host import HostInfo, CHECKED
-from support import ResultsProvider, SetCPUs, FileSystem
+from support import ResultsProvider, SetCPUs, FileSystem, SystemMonitor
 
 import os, re
 
@@ -8,9 +8,10 @@ __all__ = []
 
 __all__.append("Wrmem")
 class Wrmem(Task, ResultsProvider):
-    __config__ = ["host", "metisPath", "streamflow", "model", "trial"]
+    __config__ = ["host", "trial", "metisPath", "streamflow", "model",
+                  "*sysmonOut"]
 
-    def __init__(self, host, trial, metisPath, streamflow, model, cores):
+    def __init__(self, host, trial, cores, metisPath, streamflow, model, sysmon):
         assert model in ["default", "hugetlb"], \
             "Unknown Metis memory model %r" % model
 
@@ -21,12 +22,14 @@ class Wrmem(Task, ResultsProvider):
         self.metisPath = metisPath
         self.streamflow = streamflow
         self.model = model
+        self.sysmon = sysmon
 
     def wait(self, m):
         obj = os.path.join(self.metisPath, "obj." + self.model)
         cmd = [os.path.join(obj, "app",
                             "wrmem" + (".sf" if self.streamflow else "")),
                "-p", str(self.cores)]
+        cmd = self.sysmon.wrap(cmd, "Starting mapreduce", "Finished mapreduce")
         addEnv = {"LD_LIBRARY_PATH" : os.path.join(obj, "lib")}
 
         # Run
@@ -35,22 +38,8 @@ class Wrmem(Task, ResultsProvider):
 
         # Get result
         log = self.host.r.readFile(logPath)
-        # XXX Use sysmon to get real time
-        self.setResults(1, "job", "jobs", parseResults(log))
-
-__all__.append("parseResults")
-def parseResults(log):
-    out = []
-    realRe = re.compile(r".*\bReal:\s*([0-9]+)\s*$")
-    for l in log.splitlines():
-        m = realRe.match(l)
-        if m:
-            out.append(float(m.group(1))/1000)
-    if not out:
-        raise ValueError("Failed to parse results log")
-    if len(out) > 1:
-        raise ValueError("Multiple results found in results log")
-    return out[0]
+        self.sysmonOut = self.sysmon.parseLog(log)
+        self.setResults(1, "job", "jobs", self.sysmonOut["time.real"])
 
 class Metis(object):
     def __str__(self):
@@ -68,9 +57,11 @@ class Metis(object):
         metisPath = os.path.join(cfg.benchRoot, "metis")
         if cfg.hotplug:
             m += SetCPUs(host = host, num = cfg.cores)
+        sysmon = SystemMonitor(host)
+        m += sysmon
         for trial in range(cfg.trials):
-            m += Wrmem(host, trial, metisPath, cfg.streamflow, cfg.model,
-                       cfg.cores)
+            m += Wrmem(host, trial, cfg.cores, metisPath, cfg.streamflow,
+                       cfg.model, sysmon)
         # m += cfg.monitors
         m.run()
 

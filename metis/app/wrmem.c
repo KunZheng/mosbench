@@ -252,7 +252,11 @@ main(int argc, char *argv[])
     memset(&fdata[pos], 0, inputsize - pos);
     if (fast)
 	return 0;
+    printf("Starting mapreduce\n");
+    fflush(stdout);
     do_mapreduce(nprocs, map_tasks, reduce_tasks, fdata, inputsize, &wr_val);
+    printf("Finished mapreduce\n");
+    fflush(stdout);
     mr_print_stats();
     if (!quiet)
 	print_top(&wr_val, ndisp);
