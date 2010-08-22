@@ -1,8 +1,8 @@
 from mparts.manager import Task
 from mparts.host import HostInfo, CHECKED, UNCHECKED
 from mparts.util import Progress
-from support import ResultsProvider, SourceFileProvider, SetCPUs, FileSystem, \
-    SystemMonitor
+from support import ResultsProvider, SourceFileProvider, SetCPUs, PrefetchDir, \
+    FileSystem, SystemMonitor
 
 import os
 
@@ -37,7 +37,8 @@ class MakeKernel(Task, ResultsProvider, SourceFileProvider):
             # Clean
             self.host.r.run(self.__cmd("clean"), stdout = logPath)
 
-            # Build init/main.o first to eliminate sequential early build
+            # Build init/main.o first.  This gets most of the serial
+            # early build stages out of the way.
             self.host.r.run(self.__cmd("init/main.o"), stdout = logPath)
 
         # Build for real
@@ -64,7 +65,12 @@ class Gmake(object):
         m += HostInfo(host)
         fs = FileSystem(host, cfg.fs, clean = True)
         m += fs
-        # XXX Prefetch source files?
+        # It's really hard to predict what make will access, so we
+        # prefetch the whole source tree.  This, combined with the
+        # pre-build of init/main.o, eliminates virtually all disk
+        # reads.  For the rest, we'll just have to rely on multiple
+        # trials or at least multiple configurations to cache.
+        m += PrefetchDir(host, cfg.kernelRoot, ["*/.git"])
         if cfg.hotplug:
             m += SetCPUs(host = host, num = cfg.cores)
         sysmon = SystemMonitor(host)
