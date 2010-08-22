@@ -2,7 +2,7 @@ from mparts.manager import Task
 from mparts.host import HostInfo, CHECKED
 from support import ResultsProvider, SetCPUs, FileSystem, SystemMonitor
 
-import os, re
+import os
 
 __all__ = []
 

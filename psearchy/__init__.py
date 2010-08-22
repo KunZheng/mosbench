@@ -4,7 +4,7 @@ from mparts.util import Progress
 from support import ResultsProvider, SetCPUs, PrefetchList, FileSystem, \
     SystemMonitor
 
-import os, re
+import os
 
 __all__ = []
 
