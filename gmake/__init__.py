@@ -48,10 +48,6 @@ class MakeKernel(Task, ResultsProvider, SourceFileProvider):
         self.host.r.run(self.sysmon.wrap(self.__cmd("vmlinux.o")),
                         stdout = logPath)
 
-        cmd = ["make", "-C", self.srcPath, "O=" + self.objPath,
-               "-j", str(self.cores*2), "vmlinux.o"]
-        cmd = self.sysmon.wrap(cmd)
-
         # Get result
         log = self.host.r.readFile(logPath)
         self.sysmonOut = self.sysmon.parseLog(log)
