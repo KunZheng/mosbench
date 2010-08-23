@@ -3,6 +3,8 @@ from __future__ import with_statement
 import sys, os, subprocess, errno, hashlib, threading, signal
 from mparts.rpc import RPCServer, RPCProxy
 
+LOG_COMMANDS = False
+
 __all__ = ["CAPTURE", "STDERR", "DISCARD",
            "CHECKED", "UNCHECKED"]
 
@@ -112,8 +114,21 @@ class Process(object):
             raise ValueError("%s exited with %d" % (self.__cmd, code))
         return code
 
+SHELL_SPECIALS = set("\\'\"`<>|; \t\n()[]?#$^&*=")
+def shellEscape(s):
+    if set(s).isdisjoint(SHELL_SPECIALS):
+        # No quoting necessary
+        return s
+    if not "'" in s:
+        # Single quoting works
+        return "'" + s + "'"
+    # Have to double quote.  See man bash QUOTING.
+    s = (s.replace("\\", "\\\\").replace("\"", "\\\"").replace("$", "\\$")
+         .replace("`", "\\`").replace("!", "\\!"))
+    return '"' + s + '"'
+
 class RemoteHost(object):
-    def init(self, rootDir, cwd):
+    def init(self, rootDir, cwd, name):
         # XXX This is terrible.  Since we're sharing our root tree
         # between a regular user and root and most file operations,
         # including cleaning up the tree, are done as the regular
@@ -128,6 +143,8 @@ class RemoteHost(object):
         os.chdir(lcwd)
 
         self.__makedirs(os.path.join(rootDir, "out"))
+
+        self.__name = name
 
     def __safePath(self, p):
         if not os.path.normpath(p).startswith(self.__rootDir):
@@ -209,6 +226,9 @@ class RemoteHost(object):
             preexec = None
 
         # Create subprocess
+        if LOG_COMMANDS:
+            print >> sys.stderr, \
+                "=%s= %s" % (self.__name, " ".join(map(shellEscape, cmd)))
         try:
             p = subprocess.Popen(cmd, stdin = pstdin, stdout = pstdout,
                                  stderr = pstderr, preexec_fn = preexec,

@@ -119,7 +119,7 @@ class Host(Task, SourceFileProvider):
         # Start our sudo connection.  We do this lazily because we may
         # not need root access on a host.
         self.__sudoConn = self.__connect(True)
-        self.__sudoConn.r.init(self.__rootDir, os.getcwd())
+        self.__sudoConn.r.init(self.__rootDir, os.getcwd(), "root@" + str(self))
         return self.__sudoConn.r
 
     def __str__(self):
@@ -153,11 +153,11 @@ class Host(Task, SourceFileProvider):
             self.__rConn = self.__connect(False)
         # We init each time because rsync nukes both our remote cwd
         # and out directory.
-        self.r.init(self.__rootDir, os.getcwd())
+        self.r.init(self.__rootDir, os.getcwd(), str(self))
         # Likewise, we have to re-init our sudo connection, if we have
         # one
         if self.__sudoConn:
-            self.sudo.init(self.__rootDir, os.getcwd())
+            self.sudo.init(self.__rootDir, os.getcwd(), "root@" + str(self))
 
     def stop(self, m):
         """Stop this host.  Fetch result files into the local results
@@ -311,7 +311,7 @@ class HostInfo(Task):
         self.sysctla = None
 
     def start(self):
-        unamep = self.host.sudo.run(["uname", "-a"], stdout = server.CAPTURE)
+        unamep = self.host.r.run(["uname", "-a"], stdout = server.CAPTURE)
         uname = unamep.stdoutRead()
         self.uname = uname.strip()
         self.kernel = uname.split()[2]
@@ -352,9 +352,9 @@ class HostInfo(Task):
         # We gather sysctl settings here because other tasks may have
         # changed them
         self.sysctla = {}
-        sc = self.host.sudo.run(["/sbin/sysctl", "-a"],
-                                stdout = server.CAPTURE,
-                                stderr = server.DISCARD).stdoutRead()
+        sc = self.host.r.run(["/sbin/sysctl", "-a"],
+                             stdout = server.CAPTURE,
+                             stderr = server.DISCARD).stdoutRead()
         for l in sc.splitlines():
             k, v = l.split(" = ", 1)
             if v.isdigit():
