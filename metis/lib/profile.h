@@ -3,6 +3,7 @@
 
 #include <inttypes.h>
 #include "mr-conf.h"
+#include "mr-types.h"
 
 typedef struct {
     uint64_t user;		// ticks spent in user mode
@@ -22,7 +23,7 @@ void prof_worker_start(int phase, int cid);
 void prof_worker_end(int phase, int cid);
 void prof_print(int ncores);
 
-void prof_phase_init(prof_phase_stat * st);
+void prof_phase_init(prof_phase_stat * st, task_type_t phase);
 void prof_phase_end(prof_phase_stat * st);
 
 #else
@@ -33,7 +34,7 @@ void prof_phase_end(prof_phase_stat * st);
 #define prof_enterkcmp()
 #define prof_leavekcmp()
 
-#define prof_phase_init(p)
+#define prof_phase_init(p, phase)
 #define prof_phase_end(p)
 
 #define prof_worker_start(phase, cid)

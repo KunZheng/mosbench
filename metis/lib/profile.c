@@ -1,12 +1,15 @@
 #include <sys/resource.h>
+#include <sys/time.h>
 #include "profile.h"
 #include "bench.h"
 #include "ibs.h"
 #include "mr-types.h"
+#include "perf.h"
 
 #ifdef PROFILE_ENABLED
 enum { profile_app = 1 };
-enum { profile_phases = 0 };
+enum { profile_phases_breakdown = 0 };
+enum { profile_phases_perf = 0 };
 enum { profile_kcmp = 0 };
 enum { profile_worker = 1 };
 /* Make sure the pmcs are programmed before enabling pmc */
@@ -16,7 +19,7 @@ static uint64_t app_tot[JOS_NCPU];
 static uint64_t kcmp_tot[JOS_NCPU];
 extern __thread int cur_lcpu;
 enum { pmc0, pmc1, pmc2, pmc3, ibslat, ibscnt, tsc, app_tsc, app_kcmp,
-    app_pmc1,
+    app_pmc1, minflt,
     statcnt
 };
 static char *cname[] = {
@@ -30,6 +33,7 @@ static char *cname[] = {
     [app_tsc] = "tsc@app",
     [app_kcmp] = "# kcmp",
     [app_pmc1] = "pmc1@app",	// pmc1 in applcation
+    [minflt] = "minflt"
 };
 
 typedef union {
@@ -89,29 +93,40 @@ prof_worker_start(int phase, int cid)
     stats[phase][cid].v[app_kcmp] = 0;
     stats[phase][cid].v[app_pmc1] = 0;
 
-    pmcs_start.v[pmc0] = __read_pmc(0);
-    pmcs_start.v[pmc1] = __read_pmc(1);
-    pmcs_start.v[pmc2] = __read_pmc(2);
-    pmcs_start.v[pmc3] = __read_pmc(3);
+    struct rusage ru;
+    getrusage(RUSAGE_THREAD, &ru);
+    stats[phase][cid].v[minflt] = ru.ru_minflt * 1000;
+    stats[phase][cid].v[pmc0] = __read_pmc(0);
+    stats[phase][cid].v[pmc1] = __read_pmc(1);
+    stats[phase][cid].v[pmc2] = __read_pmc(2);
+    stats[phase][cid].v[pmc3] = __read_pmc(3);
 
     ibs_start(cid);
-    pmcs_start.v[ibscnt] = ibs_read_count(cid);
-    pmcs_start.v[ibslat] = ibs_read_latency(cid);
-    pmcs_start.v[tsc] = read_tsc();
+    stats[phase][cid].v[ibscnt] = ibs_read_count(cid);
+    stats[phase][cid].v[ibslat] = ibs_read_latency(cid);
+    stats[phase][cid].v[tsc] = read_tsc();
 }
 
 void
 prof_worker_end(int phase, int cid)
 {
-    stats[phase][cid].v[pmc0] = __read_pmc(0) - pmcs_start.v[pmc0];
-    stats[phase][cid].v[pmc1] = __read_pmc(1) - pmcs_start.v[pmc1];
-    stats[phase][cid].v[pmc2] = __read_pmc(2) - pmcs_start.v[pmc2];
-    stats[phase][cid].v[pmc3] = __read_pmc(3) - pmcs_start.v[pmc3];
+
     ibs_stop(cid);
     stats[phase][cid].v[ibslat] =
-	ibs_read_latency(cid) - pmcs_start.v[ibslat];
-    stats[phase][cid].v[ibscnt] = ibs_read_count(cid) - pmcs_start.v[ibscnt];
-    stats[phase][cid].v[tsc] = read_tsc() - pmcs_start.v[tsc];
+	ibs_read_latency(cid) - stats[phase][cid].v[ibslat];
+    stats[phase][cid].v[ibscnt] = 
+	ibs_read_count(cid) - stats[phase][cid].v[ibscnt];
+    stats[phase][cid].v[tsc] = read_tsc() - stats[phase][cid].v[tsc];
+
+    struct rusage ru;
+    getrusage(RUSAGE_THREAD, &ru);
+    stats[phase][cid].v[minflt] = (ru.ru_minflt * 1000) - stats[phase][cid].v[minflt];
+
+    stats[phase][cid].v[pmc0] = __read_pmc(0) - stats[phase][cid].v[pmc0];
+    stats[phase][cid].v[pmc1] = __read_pmc(1) - stats[phase][cid].v[pmc1];
+    stats[phase][cid].v[pmc2] = __read_pmc(2) - stats[phase][cid].v[pmc2];
+    stats[phase][cid].v[pmc3] = __read_pmc(3) - stats[phase][cid].v[pmc3];
+
 }
 
 static void
@@ -159,43 +174,46 @@ prof_print(int ncores)
     }
     if (profile_worker) {
 	uint64_t scale = 1000;
-	printf("MAP[scale=%ld]\n", scale);
+	printf("MAP[scale=%ld for minflt, %ld for others]\n", scale / 1000, scale);
 	prof_print_phase(MAP, ncores, scale);
-	printf("REDUCE[scale=%ld]\n", scale);
+	printf("REDUCE[scale=%ld for minflt, %ld for others]\n", scale / 1000, scale);
 	prof_print_phase(REDUCE, ncores, scale);
-	printf("MERGE[scale=%ld]\n", scale);
+	printf("MERGE[scale=%ld for miinflt, %ld for others]\n", scale / 1000, scale);
 	prof_print_phase(MERGE, ncores, scale);
     }
 }
-
 void
-prof_phase_init(prof_phase_stat * st)
+prof_phase_init(prof_phase_stat * st, task_type_t phase)
 {
-    if (!profile_phases)
-	return;
-    FILE *fd = fopen("/proc/stat", "r");
-    assert(fd);
-    assert(fscanf(fd, "cpu %lu %lu %lu %lu", &st->user,
-		  &st->user_low, &st->system, &st->idle) == 4);
-    fclose(fd);
+    if (profile_phases_breakdown) {
+        FILE *fd = fopen("/proc/stat", "r");
+        assert(fd);
+        assert(fscanf(fd, "cpu %lu %lu %lu %lu", &st->user,
+                  &st->user_low, &st->system, &st->idle) == 4);
+        fclose(fd);
+    }
+    if (profile_phases_perf)
+        perf_start(phase);
 }
 
 void
 prof_phase_end(prof_phase_stat * st)
 {
-    if (!profile_phases)
-	return;
-    FILE *fd = fopen("/proc/stat", "r");
-    assert(fd);
-    prof_phase_stat now;
-    assert(fscanf(fd, "cpu %lu %lu %lu %lu", &now.user,
-		  &now.user_low, &now.system, &now.idle) == 4);
-    fclose(fd);
-    st->user = now.user - st->user;
-    st->user_low = now.user_low - st->user_low;
-    st->system = now.system - st->system;
-    st->idle = now.idle - st->idle;
-    printf("time(ticks) user: %ld, user_low: %ld, system: %ld, idle: %ld\n",
-	   st->user, st->user_low, st->system, st->idle);
+    if (profile_phases_breakdown) {
+        FILE *fd = fopen("/proc/stat", "r");
+        assert(fd);
+        prof_phase_stat now;
+        assert(fscanf(fd, "cpu %lu %lu %lu %lu", &now.user,
+              &now.user_low, &now.system, &now.idle) == 4);
+        fclose(fd);
+        st->user = now.user - st->user;
+        st->user_low = now.user_low - st->user_low;
+        st->system = now.system - st->system;
+        st->idle = now.idle - st->idle;
+        printf("time(ticks) user: %ld, user_low: %ld, system: %ld, idle: %ld\n",
+               st->user, st->user_low, st->system, st->idle);
+    }
+    if (profile_phases_perf)
+        perf_end();
 }
 #endif
