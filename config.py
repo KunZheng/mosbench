@@ -57,6 +57,13 @@ shared *= mk(benchRoot = "~/mosbench")
 # a pristine check out of Linux 2.6.35-rc5 (XXX correct?).
 shared *= mk(textRoot = "~/scale-linux")
 
+# kernelRoot specifies the directory on the primary host where the
+# kernel source to use for the gmake benchmark can be found.  To
+# reproduce the results in the paper, this should be a check out of
+# Linux 2.6.35-rc5 (XXX correct?).  This can be the same directory
+# used for textRoot above.
+shared *= mk(kernelRoot = "~/scale-linux")
+
 # fs specifies which type of file system to use.  The file system
 # names here must match the available file system types in mkmounts.
 shared *= mk(fs = "tmpfs-separate")
@@ -79,10 +86,19 @@ shared *= mk(trials = 3)
 # access.
 shared *= mk(hotplug = True)
 
-# cores specifies the number of cores to use.  This must be the last
-# variable in the shared configuration for the graphing tools to work
-# (which also means it generally can't be overridden per benchmark).
-shared *= mk(cores = [1] + range(0, 49, 4)[1:])
+# cores specifies the number of cores to use.  This must be
+# non-constant and must be the last variable in the shared
+# configuration for the graphing tools to work (which also means it
+# generally shouldn't be overridden per benchmark).
+shared *= mk(cores = [1] + range(0, 49, 4)[1:], nonConst = True)
+
+##################################################################
+# gmake
+#
+
+import gmake
+
+gmake = mk(benchmark = gmake.runner, nonConst = True)
 
 ##################################################################
 # psearchy
@@ -121,9 +137,10 @@ metis *= mk(model = ["default", "hugetlb"])
 # one configuration.  Furthermore, instead of computing the regular
 # product, we compute a "merge" product, where assignments from the
 # left will override assignments to the same variables from the right.
-#configSpace = (psearchy + metis).merge(shared)
-configSpace = (psearchy).merge(shared)
+#configSpace = (gmake + psearchy + metis).merge(shared)
+#configSpace = (psearchy).merge(shared)
 #configSpace = (metis).merge(shared)
+configSpace = (gmake).merge(shared)
 
 ##################################################################
 # Run

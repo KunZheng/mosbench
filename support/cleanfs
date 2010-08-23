@@ -16,7 +16,7 @@ fi
 
 case $1 in
     tmpfs|tmpfs-separate)
-        rm -f $BASE/$1/[0-9]*/*
+        rm -rf $BASE/$1/[0-9]*/*
         ;;
     hugetlb)
         rm -f $BASE/$1/pagefile*

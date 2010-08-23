@@ -506,6 +506,12 @@ acl_check_data:
 
 begin routers
 
+# This router matches any user @mosbench.org
+virtual_user:
+  driver = accept
+  domains = mosbench.org
+  transport = local_delivery
+
 # This router routes to remote hosts over SMTP by explicit IP address,
 # when an email address is given in "domain literal" form, for example,
 # <user@[192.168.35.64]>. The RFCs require this facility. However, it is

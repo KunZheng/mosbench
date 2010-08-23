@@ -141,11 +141,32 @@ class PrefetchList(Task, SourceFileProvider):
 
     def start(self):
         if self.reuse:
+            # XXX Is this actually useful?  Does it actually take any
+            # time to re-fetch something that's already been
+            # prefetched?
             if (self.host, self.filesPath) in PREFETCH_CACHE:
                 return
             PREFETCH_CACHE.add((self.host, self.filesPath))
 
         self.host.r.run([self.__script, "-l"], stdin = self.filesPath)
+
+__all__.append("PrefetchDir")
+class PrefetchDir(Task, SourceFileProvider):
+    __config__ = ["host", "topDir", "excludes"]
+
+    def __init__(self, host, topDir, excludes = []):
+        Task.__init__(self, host = host, topDir = topDir)
+        self.host = host
+        self.topDir = topDir
+        self.excludes = excludes
+
+        self.__script = self.queueSrcFile(host, "prefetch")
+
+    def start(self):
+        cmd = [self.__script, "-r"]
+        for x in self.excludes:
+            cmd.extend(["-x", x])
+        self.host.r.run(cmd + [self.topDir])
 
 __all__.append("FileSystem")
 class FileSystem(Task, SourceFileProvider):
