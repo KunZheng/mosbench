@@ -196,7 +196,7 @@ mr_run_task(task_type_t type)
 	mr_state.mr_fixed.nr_cpus;
     prof_phase_stat st;
     memset(&st, 0, sizeof(st));
-    prof_phase_init(&st);
+    prof_phase_init(&st, type);
     int *task_pos = (int *) calloc(1, sizeof(int));
     pthread_t tid[JOS_NCPU];
     for (int i = 0; i < ncpus; i++) {
