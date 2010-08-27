@@ -1,0 +1,18 @@
+#!/bin/sh
+
+set -e
+
+# XXX Maybe the spool should go where maildir is
+
+if [ $# != 2 ]; then
+    echo "Usage: $0 eximdir maildir" >&2
+    exit 2
+fi
+
+BASE=$(cd `dirname $0`; pwd)
+INSTALL_DIR=$BASE/$1
+if [ ! -f "$INSTALL_DIR/bin/exim" ]; then
+    echo "No exim found in $INSTALL_DIR" >&2
+    exit 1
+fi
+sed -e "s,@INSTALL_DIR@,$INSTALL_DIR,;s,@MAIL_DIR@,$2," < $BASE/configure.tmpl

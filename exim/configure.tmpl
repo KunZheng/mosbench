@@ -553,7 +553,7 @@ dnslookup:
 
 
 # This router handles aliasing using a linearly searched alias file with the
-# name /home/export/sbw/exim/etc/aliases. When this configuration is installed automatically,
+# name @INSTALL_DIR@/etc/aliases. When this configuration is installed automatically,
 # the name gets inserted into this file from whatever is set in Exim's
 # build-time configuration. The default path is the traditional /etc/aliases.
 # If you install this configuration by hand, you need to specify the correct
@@ -576,7 +576,7 @@ system_aliases:
   driver = redirect
   allow_fail
   allow_defer
-  data = ${lookup{$local_part}lsearch{/export/home/sbw/exim/etc/aliases}}
+  data = ${lookup{$local_part}lsearch{@INSTALL_DIR@/etc/aliases}}
 # user = exim
   file_transport = address_file
   pipe_transport = address_pipe
@@ -668,14 +668,12 @@ remote_smtp:
 local_delivery:
   driver = appendfile
 #  file = /var/mail/$local_part
-  file = /export/home/sbw/exim/mail/$local_part
+  file = @MAIL_DIR@/$local_part
 # use_lockfile=false does not help performance on GUK kernel
   use_lockfile = false
   delivery_date_add
   envelope_to_add
   return_path_add
-  user = sbw
-  group = sbw
 #  mode = 0660
   no_check_owner
   file_must_exist = true
