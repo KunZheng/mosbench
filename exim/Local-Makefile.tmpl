@@ -100,7 +100,8 @@ CC=gcc -g
 # /usr/local/sbin. The installation script will try to create this directory,
 # and any superior directories, if they do not exist.
 
-BIN_DIRECTORY=/export/home/sbw/exim/bin
+BIN_DIRECTORY=@INSTALL_DIR@/bin
+
 
 #------------------------------------------------------------------------------
 # CONFIGURE_FILE defines where Exim's run time configuration file is to be
@@ -115,7 +116,7 @@ BIN_DIRECTORY=/export/home/sbw/exim/bin
 # don't exist. It will also install a default runtime configuration if this
 # file does not exist.
 
-CONFIGURE_FILE=/export/home/sbw/exim/etc/configure
+CONFIGURE_FILE=@INSTALL_DIR@/etc/configure
 
 # It is possible to specify a colon-separated list of files for CONFIGURE_FILE.
 # In this case, Exim will use the first of them that exists when it is run.
@@ -133,7 +134,7 @@ CONFIGURE_FILE=/export/home/sbw/exim/etc/configure
 # owner of a local mailbox.) Specifying these values as root is very strongly
 # discouraged.
 
-EXIM_USER=sbw
+EXIM_USER=@USER@
 
 # If you specify EXIM_USER as a name, this is looked up at build time, and the
 # uid number is built into the binary. However, you can specify that this
@@ -175,7 +176,7 @@ EXIM_USER=sbw
 
 # Almost all installations choose this:
 
-SPOOL_DIRECTORY=/export/home/sbw/exim/spool
+SPOOL_DIRECTORY=@INSTALL_DIR@/spool
 
 
 
@@ -332,7 +333,7 @@ PCRE_LIBS=-lpcre
 # files are defaulted in the OS/Makefile-Default file, but can be overridden in
 # local OS-specific make files.
 
-#EXIM_MONITOR=eximon.bin
+# EXIM_MONITOR=eximon.bin
 
 
 #------------------------------------------------------------------------------
@@ -850,7 +851,7 @@ ZCAT_COMMAND=/usr/bin/zcat
 # aliases). The following setting can be changed to specify a different
 # location for the system alias file.
 
-SYSTEM_ALIASES_FILE=/export/home/sbw/exim/etc/aliases
+SYSTEM_ALIASES_FILE=@INSTALL_DIR@/etc/aliases
 
 
 #------------------------------------------------------------------------------
@@ -923,7 +924,7 @@ SYSTEM_ALIASES_FILE=/export/home/sbw/exim/etc/aliases
 # it replaces the value with what is defined here. Commenting this setting
 # suppresses the check altogether.
 
-TMPDIR="/export/home/sbw/exim/tmp"
+TMPDIR="@INSTALL_DIR@/tmp"
 
 
 #------------------------------------------------------------------------------
@@ -1097,7 +1098,7 @@ TMPDIR="/export/home/sbw/exim/tmp"
 # file can be specified here. Some installations may want something like this:
 
 # PID_FILE_PATH=/var/lock/exim.pid
-PID_FILE_PATH=/export/home/sbw/exim/lock/exim.pid
+# PID_FILE_PATH=@INSTALL_DIR@/lock/exim.pid
 
 # If PID_FILE_PATH is not defined, Exim writes a file in its spool directory
 # using the name "exim-daemon.pid".

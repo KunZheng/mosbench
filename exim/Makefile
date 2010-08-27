@@ -26,3 +26,20 @@ smtpbm: smtpbm.c
 clean:
 	@echo "CLEAN"
 	$(Q)rm -rf smtpbm
+
+
+.PHONY: exim-mod
+exim-mod:
+	mkdir -p exim-4.71/Local
+	sed -e "s,@INSTALL_DIR@,`pwd`/$@,;s,@USER@,$$USER," < Local-Makefile.tmpl > exim-4.71/Local/Makefile.tmp
+	if ! cmp exim-4.71/Local/{Makefile,Makefile.tmp}; then \
+	  $(MAKE) -C exim-4.71 distclean; \
+	  mv exim-4.71/Local/Makefile.tmp exim-4.71/Local/Makefile; \
+	fi
+	$(MAKE) -C exim-4.71
+	$(MAKE) -C exim-4.71 install INSTALL_ARG=-no_chown
+
+.PHONY: exim-clean
+exim-clean:
+	$(MAKE) -C exim-4.71 distclean
+	rm -rf exim-mod exim-4.71/Local
