@@ -1,0 +1,26 @@
+diff -ru db-4.7.25.NC.orig/os/os_cpu.c db-4.7.25.NC/os/os_cpu.c
+--- db-4.7.25.NC.orig/os/os_cpu.c	2010-08-27 16:06:22.000000000 -0400
++++ db-4.7.25.NC/os/os_cpu.c	2010-08-27 16:35:55.000000000 -0400
+@@ -37,11 +37,21 @@
+ 	/*
+ 	 * Solaris, Linux.
+ 	 */
++#if !defined(MOSBENCH_CACHE_NPROC)
+ 	long nproc;
++#else
++	/* The update to this is intentionally racy */
++	static int nproc = -2;
+ 
+-	nproc = sysconf(_SC_NPROCESSORS_ONLN);
++	if (nproc == -2)
++#endif
++		nproc = sysconf(_SC_NPROCESSORS_ONLN);
++#if !defined(MOSBENCH_FORCE_MULTICORE)
+ 	return ((u_int32_t)(nproc > 1 ? nproc : 1));
+ #else
++	return ((u_int32_t)(nproc > 2 ? nproc : 2));
++#endif
++#else
+ 	return (1);
+ #endif
+ }

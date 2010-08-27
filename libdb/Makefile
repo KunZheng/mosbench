@@ -4,25 +4,33 @@ INSTALL=$(shell pwd)/db-mod
 all: install
 
 .PHONY: unpack
-unpack: .stamp.unpack
+unpack: $(BASE)
 
-.stamp.unpack:
+$(BASE):
 	tar xzf $(BASE).tar.gz
+
+patch: $(BASE)/.stamp-patch
+
+$(BASE)/.stamp-patch: | $(BASE)
 	patch -p0 -d$(BASE) < patch.4.7.25.1
 	patch -p0 -d$(BASE) < patch.4.7.25.2
 	patch -p0 -d$(BASE) < patch.4.7.25.3
 	patch -p0 -d$(BASE) < patch.4.7.25.4
+	patch -p1 -d$(BASE) < mosbench.patch
 	touch $@
 
 .PHONY: configure
-configure: .stamp.configure
+configure: $(BASE)/.stamp-configure
 
-.stamp.configure: .stamp.unpack
-	cd $(BASE)/build_unix && ../dist/configure --prefix=$(INSTALL)
+# (dist/configure replaces the -O CFLAG with what it really wants)
+$(BASE)/.stamp-configure: $(BASE)/.stamp-patch
+	cd $(BASE)/build_unix && \
+	  CFLAGS="-O -DMOSBENCH_CACHE_NPROC -DMOSBENCH_FORCE_MULTICORE" \
+	  ../dist/configure --prefix=$(INSTALL)
 	touch $@
 
 .PHONY: build
-build: .stamp.configure
+build: $(BASE)/.stamp-configure
 	$(MAKE) -C $(BASE)/build_unix
 
 .PHONY: install
