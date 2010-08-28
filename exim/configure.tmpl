@@ -43,9 +43,6 @@
 #                    MAIN CONFIGURATION SETTINGS                     #
 ######################################################################
 
-# this helps performance
-split_spool_directory = true
-
 # avoid the exec, this helps performance
 deliver_drop_privilege = true
 
@@ -307,7 +304,10 @@ timeout_frozen_after = 7d
 # happen; (2) Exim can process the queue one subdirectory at a time instead of
 # all at once, which can give better performance with large queues.
 
-# split_spool_directory = true
+# this helps performance
+split_spool_directory = true
+
+spool_directory = @SPOOL_DIR@
 
 
 

@@ -11,6 +11,9 @@ CWARNS	= -Wformat=2 -Wextra -Wmissing-noreturn -Wwrite-strings -Wshadow \
 CFLAGS  = $(DEFS) -Wall -Werror -fno-strict-aliasing $(CWARNS) \
 	  -g -O3
 
+# Build Exim with our tweaked libdb
+DBMLIB  = $(abspath ../libdb/db-mod/lib/libdb.a)
+
 ifeq ($(OS), Linux)
 LIBS = 
 endif
@@ -31,7 +34,7 @@ clean:
 .PHONY: exim-mod
 exim-mod:
 	mkdir -p exim-4.71/Local
-	sed -e "s,@INSTALL_DIR@,`pwd`/$@,;s,@USER@,$$USER," < Local-Makefile.tmpl > exim-4.71/Local/Makefile.tmp
+	sed -e "s,@INSTALL_DIR@,`pwd`/$@,;s,@USER@,$$USER,;s,@DBMLIB@,$(DBMLIB)," < Local-Makefile.tmpl > exim-4.71/Local/Makefile.tmp
 	if ! cmp exim-4.71/Local/{Makefile,Makefile.tmp}; then \
 	  $(MAKE) -C exim-4.71 distclean; \
 	  mv exim-4.71/Local/Makefile.tmp exim-4.71/Local/Makefile; \

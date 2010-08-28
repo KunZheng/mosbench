@@ -76,6 +76,9 @@
 
 CC=gcc -g
 
+# Override libdb with MOSBENCH libdb.  This also requires libpthread.
+DBMLIB=@DBMLIB@ -lpthread
+
 ###############################################################################
 #                    THESE ARE THINGS YOU MUST SPECIFY                        #
 ###############################################################################
