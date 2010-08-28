@@ -1,7 +1,7 @@
 BASE=db-4.7.25.NC
 INSTALL=$(shell pwd)/db-mod
 
-all: install
+all: db-mod
 
 .PHONY: unpack
 unpack: $(BASE)
@@ -33,8 +33,8 @@ $(BASE)/.stamp-configure: $(BASE)/.stamp-patch
 build: $(BASE)/.stamp-configure
 	$(MAKE) -C $(BASE)/build_unix
 
-.PHONY: install
-install: build
+.PHONY: db-mod
+db-mod: build
 	$(MAKE) -C $(BASE)/build_unix install
 
 clean:
