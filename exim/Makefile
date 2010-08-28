@@ -12,7 +12,7 @@ CFLAGS  = $(DEFS) -Wall -Werror -fno-strict-aliasing $(CWARNS) \
 	  -g -O3
 
 # Build Exim with our tweaked libdb
-DBMLIB  = $(abspath ../libdb/db-mod/lib/libdb.a)
+DBMLIB  = $(abspath ../libdb/db4.7-mod/lib/libdb.a) -lpthread
 
 ifeq ($(OS), Linux)
 LIBS = 
