@@ -77,7 +77,11 @@
 CC=gcc -g
 
 # Override libdb with MOSBENCH libdb.
-DBMLIB=@DBMLIB@
+DBMLIB=@DBMDIR@/lib/libdb.a -lpthread
+CFLAGS+=-I@DBMDIR@/include
+
+# Add MOSBENCH defines
+CFLAGS+=@DEFINES@
 
 ###############################################################################
 #                    THESE ARE THINGS YOU MUST SPECIFY                        #

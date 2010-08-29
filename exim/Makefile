@@ -12,7 +12,15 @@ CFLAGS  = $(DEFS) -Wall -Werror -fno-strict-aliasing $(CWARNS) \
 	  -g -O3
 
 # Build Exim with our tweaked libdb
-DBMLIB  = $(abspath ../libdb/db4.7-mod/lib/libdb.a) -lpthread
+DBMDIR  = $(abspath ../libdb/db4.7-mod)
+#DBMDIR  = $(abspath ../libdb/db4.6-mod)
+#DBMDIR = /home/rtm/bdb
+
+# Build Exim with MOSBENCH modifications
+EXIM_DEFINES = \
+	-DMOSBENCH_FAKE_LOADAVG -DMOSBENCH_WAIT_DELIVERY \
+	-DMOSBENCH_NO_TZ_LOCK -DMOSBENCH_DELIVER_SAME_CORE \
+	-DMOSBENCH_SPLIT_BY_PID
 
 ifeq ($(OS), Linux)
 LIBS = 
@@ -34,7 +42,8 @@ clean:
 .PHONY: exim-mod
 exim-mod:
 	mkdir -p exim-4.71/Local
-	sed -e "s,@INSTALL_DIR@,`pwd`/$@,;s,@USER@,$$USER,;s,@DBMLIB@,$(DBMLIB)," < Local-Makefile.tmpl > exim-4.71/Local/Makefile.tmp
+	sed -e "s,@INSTALL_DIR@,`pwd`/$@,;s,@USER@,$$USER,;s,@DBMDIR@,$(DBMDIR),;s,@DEFINES@,$(EXIM_DEFINES)," \
+	  < Local-Makefile.tmpl > exim-4.71/Local/Makefile.tmp
 	if ! cmp exim-4.71/Local/{Makefile,Makefile.tmp}; then \
 	  $(MAKE) -C exim-4.71 distclean; \
 	  mv exim-4.71/Local/Makefile.tmp exim-4.71/Local/Makefile; \
