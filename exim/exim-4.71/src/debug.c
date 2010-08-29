@@ -171,7 +171,11 @@ if (debug_ptr == debug_buffer)
   DEBUG(D_timestamp)
     {
     time_t now = time(NULL);
+#if defined(MOSBENCH_NO_TZ_LOCK)
+    struct tm *t = xlocaltime(&now);
+#else
     struct tm *t = timestamps_utc? gmtime(&now) : localtime(&now);
+#endif
     (void) sprintf(CS debug_ptr, "%02d:%02d:%02d ", t->tm_hour, t->tm_min,
       t->tm_sec);
     while(*debug_ptr != 0) debug_ptr++;

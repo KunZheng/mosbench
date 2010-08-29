@@ -49,6 +49,26 @@ Argument:  type of timestamp required:
 Returns:   pointer to fixed buffer containing the timestamp
 */
 
+#if defined(MOSBENCH_NO_TZ_LOCK)
+struct tm *
+xlocaltime(time_t *now)
+{
+  // glibc's localtime/gmtime take out exclusive locks just to protect
+  // against changes in the timezone.
+  static struct tm tm;
+  tm.tm_sec = *now % 60;
+  tm.tm_min = (*now / 60) % 60;
+  tm.tm_hour = (*now / 3600) % 24;
+  tm.tm_mday = 1;
+  tm.tm_mon = 0;
+  tm.tm_year = 1;
+  tm.tm_wday = 1;
+  tm.tm_yday = 1;
+  tm.tm_isdst = 1;
+  return &tm;
+}
+#endif
+
 uschar *
 tod_stamp(int type)
 {
@@ -69,7 +89,11 @@ else if (type == tod_epoch)
 
 else if (type == tod_zulu)
   {
+#if defined(MOSBENCH_NO_TZ_LOCK)
+  t = xlocaltime(&now);
+#else
   t = gmtime(&now);
+#endif
   (void) sprintf(CS timebuf, "%04d%02d%02d%02d%02d%02dZ",
     1900 + t->tm_year, 1 + t->tm_mon, t->tm_mday, t->tm_hour, t->tm_min,
     t->tm_sec);
@@ -78,7 +102,11 @@ else if (type == tod_zulu)
 
 /* Convert to local time or UTC */
 
+#if defined(MOSBENCH_NO_TZ_LOCK)
+t = xlocaltime(&now);
+#else 
 t = timestamps_utc? gmtime(&now) : localtime(&now);
+#endif
 
 switch(type)
   {
@@ -129,7 +157,11 @@ switch(type)
       }
     else
       {
+#if defined(MOSBENCH_NO_TZ_LOCK)
+      struct tm *gmt = xlocaltime(&now);
+#else
       struct tm *gmt = gmtime(&now);
+#endif
       diff_min = 60*(local.tm_hour - gmt->tm_hour) + local.tm_min - gmt->tm_min;
       if (local.tm_year != gmt->tm_year)
         diff_min += (local.tm_year > gmt->tm_year)? 1440 : -1440;

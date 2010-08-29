@@ -112,7 +112,7 @@ int dcc_process(uschar **listptr) {
   /* open the spooled body */
   message_subdir[1] = '\0';
   for (i = 0; i < 2; i++) {
-    message_subdir[0] = (split_spool_directory == (i == 0))? message_id[5] : 0;
+    message_subdir[0] = spool_shard(message_id, i);
     sprintf(CS mbox_path, "%s/input/%s/%s-D", spool_directory, message_subdir, message_id);
     data_file = Ufopen(mbox_path,"rb");
     if (data_file != NULL)

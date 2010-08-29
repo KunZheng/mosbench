@@ -52,6 +52,9 @@ return (int)(avg * 1000.0);
 int
 os_getloadavg(void)
 {
+#if defined(MOSBENCH_FAKE_LOADAVG)
+return 1.0; // RTM see if this increases performance
+#else
 char buffer[40];
 double avg;
 int count;
@@ -63,6 +66,7 @@ if (count <= 0) return linux_slow_getloadavg();
 count = sscanf (buffer, "%lf", &avg);
 if (count < 1) return linux_slow_getloadavg();
 return (int)(avg * 1000.0);
+#endif
 }
 #endif  /* OS_LOAD_AVERAGE */
 

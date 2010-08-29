@@ -1733,6 +1733,9 @@ for (i = 1; i < argc; i++)
     if (*argrest == 'd')
       {
       daemon_listen = TRUE;
+#if defined(MOSBENCH_WAIT_DELIVERY)
+      synchronous_delivery = TRUE; // RTM, avoid 1000s of processes
+#endif
       if (*(++argrest) == 'f') background_daemon = FALSE;
         else if (*argrest != 0) { badarg = TRUE; break; }
       }

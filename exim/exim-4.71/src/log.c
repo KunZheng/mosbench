@@ -858,6 +858,7 @@ if ((flags & LOG_MAIN) != 0 &&
 
     /* If the log is closed, open it. Then write the line. */
 
+#if !defined(MOSBENCH_NO_LOGGING)
     if (mainlogfd < 0)
       {
       open_log(&mainlogfd, lt_main);     /* No return on error */
@@ -871,6 +872,7 @@ if ((flags & LOG_MAIN) != 0 &&
       log_write_failed(US"main log", length, rc);
       /* That function does not return */
       }
+#endif
     }
   }
 

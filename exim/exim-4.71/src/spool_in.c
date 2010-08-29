@@ -51,7 +51,7 @@ splitting state. */
 for (i = 0; i < 2; i++)
   {
   int save_errno;
-  message_subdir[0] = (split_spool_directory == (i == 0))? id[5] : 0;
+  message_subdir[0] = spool_shard(id, i);
   sprintf(CS spoolname, "%s/input/%s/%s-D", spool_directory, message_subdir, id);
   deliver_datafile = Uopen(spoolname, O_RDWR | O_APPEND, 0);
   if (deliver_datafile >= 0) break;
@@ -301,7 +301,7 @@ and unsplit directories, as for the data file above. */
 for (n = 0; n < 2; n++)
   {
   if (!subdir_set)
-    message_subdir[0] = (split_spool_directory == (n == 0))? name[5] : 0;
+    message_subdir[0] = spool_shard(name, n);
   sprintf(CS big_buffer, "%s/input/%s/%s", spool_directory, message_subdir,
     name);
   f = Ufopen(big_buffer, "rb");

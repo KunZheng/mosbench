@@ -625,6 +625,24 @@ if (pid == 0)
 
       mac_smtp_fflush();
 
+#if defined(MOSBENCH_WAIT_DELIVERY)
+      struct sigaction act, oact;
+      if(synchronous_delivery)
+        {
+        memset(&act, 0, sizeof(act));
+        act.sa_handler = SIG_DFL;
+        sigemptyset(&(act.sa_mask));
+        act.sa_flags = 0;
+        sigaction(SIGCHLD, &act, &oact);
+        }
+#elif defined(MOSBENCH_DELIVER_INLINE)
+      // don't fork, does this work? may 4 rtm this does not work
+      // after all, only the first msg of each smtp connection
+      // actually is delivered.
+      deliver_message(message_id, FALSE, FALSE);
+      return;
+#endif
+
       if ((dpid = fork()) == 0)
         {
         (void)fclose(smtp_in);
@@ -660,6 +678,17 @@ if (pid == 0)
       if (dpid > 0)
         {
         DEBUG(D_any) debug_printf("forked delivery process %d\n", (int)dpid);
+
+#if defined(MOSBENCH_WAIT_DELIVERY)
+        if(synchronous_delivery)
+          {
+          int status = 0, ret;
+          // log_write(0, LOG_MAIN, "%d: synchronous wait for %d", getpid(), dpid);
+          errno = 0;
+          ret = waitpid(dpid, &status, 0);
+          sigaction(SIGCHLD, &oact, 0);
+          }
+#endif
         }
       else
         {

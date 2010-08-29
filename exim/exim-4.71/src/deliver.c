@@ -77,6 +77,22 @@ static uschar *used_return_path = NULL;
 
 static uschar spoolname[PATH_MAX];
 
+#if defined(MOSBENCH_DELIVER_SAME_CORE)
+#include <syscall.h>
+
+/* sbw */
+static pid_t wait_fork(void)
+{
+  pid_t pid = 0;
+  int flags;
+  int r;
+
+  flags = CLONE_VFORK|CLONE_PARENT_SETTID|SIGCHLD;
+  if (r = syscall(SYS_clone, flags, 0, &pid, 0) < 0)
+    return r;
+  return pid;
+}
+#endif
 
 
 /*************************************************
@@ -1719,7 +1735,11 @@ a clean slate and doesn't interfere with the parent process. */
 
 search_tidyup();
 
+#if defined(MOSBENCH_DELIVER_SAME_CORE)
+if ((pid = wait_fork()) == 0)
+#else
 if ((pid = fork()) == 0)
+#endif
   {
   BOOL replicate = TRUE;
 

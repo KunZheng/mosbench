@@ -369,4 +369,16 @@ extern BOOL    verify_sender(int *, uschar **);
 extern BOOL    verify_sender_preliminary(int *, uschar **);
 extern void    version_init(void);
 
+static inline char spool_shard(uschar *message_id, int attempt)
+{
+if (split_spool_directory == (attempt == 0)) {
+#ifdef MOSBENCH_SPLIT_BY_PID
+  return message_id[12];
+#else
+  return message_id[5];
+#endif
+}
+return 0;
+}
+
 /* End of functions.h */

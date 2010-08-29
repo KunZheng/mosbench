@@ -1005,7 +1005,7 @@ if (action >= MSG_SHOW_BODY)
 
   for (i = 0; i < 2; i++)
     {
-    message_subdir[0] = (split_spool_directory == (i == 0))? id[5] : 0;
+    message_subdir[0] = spool_shard(id, i);
     sprintf(CS spoolname, "%s/%s/%s/%s%s", spool_directory, subdirectory,
       message_subdir, id, suffix);
     fd = Uopen(spoolname, O_RDONLY, 0);
