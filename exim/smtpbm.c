@@ -1,5 +1,5 @@
 /*
- * smtpbm ip-address user-name
+ * smtpbm ip-address port username from-address
  *
  * generate lots of mail to somebody's port 25.
  */
@@ -15,8 +15,11 @@
 #include <assert.h>
 #include <sys/time.h>
 #include <netinet/tcp.h>
+#include <signal.h>
+#include <sys/prctl.h>
 
-static int total = 0;
+static int total;
+static double start;
 
 static void usage(void)
 {
@@ -24,6 +27,7 @@ static void usage(void)
 	exit(1);
 }
 
+__attribute__((noreturn))
 static void oops(const char *s)
 {
 	extern int errno;
@@ -119,32 +123,59 @@ static void do1(struct sockaddr_in *sin, const char *user, const char *from)
 		xread(s, buf);
 		if(buf[0] != '2')
 			oops("did not get final 2xx");
-		total++;
+		__sync_fetch_and_add(&total, 1);
 	}
 	xwrite(s, "QUIT");
 	xread(s, buf);
 	close(s);
 }
 
+static void reset(int sig)
+{
+	total = 0;
+	start = now();
+}
+
+static void printTotal(int sig)
+{
+	printf("%d messages; %.2f messages/sec\n",
+	       total, total / (now() - start));
+	fflush(stdout);
+	if (sig != SIGUSR2) {
+		signal(sig, SIG_DFL);
+		kill(getpid(), sig);
+	}
+}
+
 int main(int argc, char ** argv)
 {
 	struct sockaddr_in sin;
-	double t0, t1;
-	
+
+	if(prctl(PR_SET_PDEATHSIG, SIGINT, 0, 0, 0) == -1)
+		oops("prctl");
+
+	if(argc > 2 && strcmp(argv[1], "-p") == 0) {
+		if (getppid() != atoi(argv[2]))
+			oops("parent exited early");
+		argc -= 2;
+		argv += 2;
+	}
+
 	if(argc != 5)
 		usage();
-	
+
+	signal(SIGUSR1, reset);
+	signal(SIGUSR2, printTotal);
+	signal(SIGINT, printTotal);
+
 	memset(&sin, '\0', sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_port = htons(atoi(argv[2]));
 	sin.sin_addr.s_addr = inet_addr(argv[1]);
 	if(sin.sin_addr.s_addr == INADDR_NONE)
 		usage();
-	
-	t0 = now();
-	while(now() - t0 < 60)
+
+	reset(0);
+	while (1)
 		do1(&sin, argv[3], argv[4]);
-	t1 = now();
-	printf("%.2f / sec\n", total / (t1 - t0));
-	return 0;
 }
