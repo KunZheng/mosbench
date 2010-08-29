@@ -70,31 +70,43 @@ if [ "x$CPUS" = x ]; then
     exit 1
 fi
 
+dotmpfs() {
+    if [ $UNMOUNT ]; then
+        umount $1 || true
+    else
+        mkdir -p $1
+        $MOUNT -t tmpfs none $1
+    fi
+}
+
 # Create mounts
 case $1 in
     tmpfs-separate)
+        # Mount/unmount per-CPU
         for cpu in $CPUS; do
-            D=$BASE/$1/$cpu
-            if [ $UNMOUNT ]; then
-                umount $D || echo "Failed to unmount $D" >&2
-            else
-                mkdir -p $D
-                $MOUNT -t tmpfs none $D
-            fi
+            dotmpfs $BASE/$1/$cpu
         done
+        # Mount/unmount Exim spool directories
+        # intersperse ' ' $ ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z']
+        spools="0 1 2 3 4 5 6 7 8 9 a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z"
+        if [ ! $UNMOUNT ]; then dotmpfs $BASE/$1/spool; fi
+        for spool in $spools; do
+            dotmpfs $BASE/$1/spool/input/$spool
+            # This doesn't make much of a difference
+#            dotmpfs $BASE/$1/spool/msglog/$spool
+        done
+        if [ $UNMOUNT ]; then dotmpfs $BASE/$1/spool; fi
         ;;
     tmpfs)
-        D=$BASE/$1
-        if [ $UNMOUNT ]; then
-            umount $D
-        else
-            mkdir -p $D
-            $MOUNT -t tmpfs none $D
+        dotmpfs $BASE/$1
+        if [ ! $UNMOUNT ]; then
+            # Make per-CPU directories
             for cpu in $CPUS; do
                 D=$BASE/$1/$cpu
                 mkdir -m 0755 $D
                 chown $FSUID:$FSGID $D
             done
+            # No need to make Exim spools.  Exim will do that.
         fi
         ;;
     hugetlb)
