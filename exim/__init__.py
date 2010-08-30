@@ -47,7 +47,7 @@ class EximDaemon(Task):
             self.stop()
 
 class Smtpbm(Task, ResultsProvider):
-    __config__ = ["host", "trial", "eximPath", "clients", "port"]
+    __config__ = ["host", "trial", "eximPath", "clients", "port", "*sysmonOut"]
 
     # XXX Control warmup/duration
     def __init__(self, host, trial, eximPath, cores, clients, port, sysmon):
@@ -61,7 +61,8 @@ class Smtpbm(Task, ResultsProvider):
         self.sysmon = sysmon
 
     def wait(self):
-        # XXX Clean up mail files
+        # We may want to wipe out old mail files, but it doesn't seem
+        # to make a difference.
 
         cmd = [os.path.join(self.eximPath, "run-smtpbm"),
                str(self.clients), str(self.port)]
