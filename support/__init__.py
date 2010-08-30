@@ -199,11 +199,17 @@ class FileSystem(Task, SourceFileProvider):
         if self.clean:
             self.host.r.run([self.__script, self.fstype])
 
+__all__.append("waitForLog")
 def waitForLog(host, logPath, name, secs, string):
     for retry in range(secs*2):
-        log = host.r.readFile(logPath)
-        if string in log:
-            return
+        try:
+            log = host.r.readFile(logPath)
+        except EnvironmentError, e:
+            if e.errno != ENOENT:
+                raise
+        else:
+            if string in log:
+                return
         time.sleep(0.5)
     raise RuntimeError("Timeout waiting for %s to start" % name)
 
