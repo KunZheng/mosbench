@@ -1,4 +1,4 @@
-import sys, os, signal, time
+import sys, os, signal, time, errno
 
 from mparts.manager import Task
 from mparts.host import *
@@ -205,7 +205,7 @@ def waitForLog(host, logPath, name, secs, string):
         try:
             log = host.r.readFile(logPath)
         except EnvironmentError, e:
-            if e.errno != ENOENT:
+            if e.errno != errno.ENOENT:
                 raise
         else:
             if string in log:
