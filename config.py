@@ -2,6 +2,10 @@ from mparts.configspace import ConfigSpace
 from mparts.host import Host
 from support import perfLocked
 
+# For an explanation of configuration spaces and a description of why
+# we use '*' and '+' all over this file, see the module documentation
+# for mparts.configspace.
+
 mk = ConfigSpace.mk
 
 ##################################################################
@@ -12,17 +16,18 @@ shared = ConfigSpace.unit()
 
 # MOSBENCH involves three types of hosts:
 # 1. The single primary host runs the benchmark applications.  It
-#    should be a large multicore machine, preferably running the GUK
-#    Linux kernel.  For the Apache and Memcached benchmarks, it should
-#    have a very fast network connection to the load generators.
-# 2. A set of secondary hosts act as load generators for server-client
-#    benchmarks.  This list should not include the primary host.
+#    should be a large multicore machine.  For the Apache and
+#    Memcached benchmarks, it should have a very fast network
+#    connection to the load generators.
+# 2. A set of secondary hosts act as load generators for the
+#    memcached, Apache, and Postgres benchmarks.  This list should
+#    *not* include the primary host.
 # 3. The driver host runs the driver script, which coordinates the
 #    benchmark programs and load generators on the primary and
-#    secondary hosts.  It can be run from a primary or secondary host,
-#    though doing so may perturb the results.  This host must have ssh
-#    keys set up for passwordless access to all primary and secondary
-#    hosts.
+#    secondary hosts and gather results.  It can be run from a primary
+#    or secondary host, though doing so may perturb the results.  This
+#    host must have ssh keys set up for passwordless access to all
+#    primary and secondary hosts.
 # Here we configure these hosts.  All of the host names provided here
 # must work from all of the hosts (for example, don't use
 # "localhost"), unless explicit routes are provided from every host.
@@ -64,8 +69,8 @@ shared *= mk(textRoot = "~/scale-linux")
 # used for textRoot above.
 shared *= mk(kernelRoot = "~/scale-linux")
 
-# fs specifies which type of file system to use.  The file system
-# names here must match the available file system types in mkmounts.
+# fs specifies which type of file system to use.  This can be any file
+# system type known to mkmounts except hugetlbfs.
 shared *= mk(fs = "tmpfs-separate")
 
 # trials is the number of times to run each benchmark.  The best
@@ -91,6 +96,18 @@ shared *= mk(hotplug = True)
 # configuration for the graphing tools to work (which also means it
 # generally shouldn't be overridden per benchmark).
 shared *= mk(cores = [1] + range(0, 49, 4)[1:], nonConst = True)
+
+##################################################################
+# Exim
+#
+
+import exim
+
+exim = mk(benchmark = exim.runner, nonConst = True)
+
+exim *= mk(eximBuild = "exim-mod")
+exim *= mk(eximPort = 2526)
+exim *= mk(eximClients = 64)
 
 ##################################################################
 # gmake
@@ -137,10 +154,11 @@ metis *= mk(model = ["default", "hugetlb"])
 # one configuration.  Furthermore, instead of computing the regular
 # product, we compute a "merge" product, where assignments from the
 # left will override assignments to the same variables from the right.
-#configSpace = (gmake + psearchy + metis).merge(shared)
-#configSpace = (psearchy).merge(shared)
-#configSpace = (metis).merge(shared)
-configSpace = (gmake).merge(shared)
+#configSpace = (exim + gmake + psearchy + metis).merge(shared)
+configSpace = exim.merge(shared)
+#configSpace = gmake.merge(shared)
+#configSpace = psearchy.merge(shared)
+#configSpace = metis.merge(shared)
 
 ##################################################################
 # Run
