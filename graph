@@ -6,6 +6,16 @@ import mparts.graph as graph
 
 import sys, os
 
+def usage():
+    print >> sys.stderr, """\
+Usage: %s dirs...
+
+Recursively find all benchmark data point directories under the
+directories given as arguments and graph those data points.  Separate
+benchmark types will be plotted in separate graphs.
+""" % sys.argv[0]
+    sys.exit(2)
+
 def resultsTable(exps):
     out = []
     haveTimes = False
@@ -46,6 +56,9 @@ def resultsTable(exps):
         cols.extend(["user", "sys", "idle", "timeUnits"])
     desc = table.TableDesc(*cols)
     return table.Table.fromIterable(out, desc)
+
+if len(sys.argv) == 1:
+    usage()
 
 graphs = {}
 for name, exps in series(*sys.argv[1:]):
