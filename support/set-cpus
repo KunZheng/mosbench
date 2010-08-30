@@ -72,6 +72,8 @@ def interactive():
             except ValueError as e:
                 print >> sys.stderr, e
                 sys.exit(1)
+    except KeyboardInterrupt:
+        pass
     finally:
         setCPUs(possible)
 
