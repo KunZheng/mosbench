@@ -1,0 +1,132 @@
+== Running MOSBENCH ==
+
+MOSBENCH is a multi-host benchmark, so it's important to understand
+the roles of various hosts.  MOSBENCH involves three types of hosts:
+
+The single "primary host" runs the benchmark applications.  It should
+be a large multicore machine.  For the Apache and Memcached
+benchmarks, it should have a very fast network connection to the load
+generators.
+
+A set of "secondary hosts" act as load generators for the memcached,
+Apache, and Postgres benchmarks.  This list should *not* include the
+primary host.
+
+Finally, the "driver host" runs the driver script, which coordinates
+the benchmark programs and load generators on the primary and
+secondary hosts and gathers results.  It can be run from a primary or
+secondary host, though doing so may perturb the results.
+
+MOSBENCH must be installed on the primary and driver hosts, but
+nothing needs to be installed on the secondary hosts.  The driver host
+will push files to the secondary hosts as needed.
+
+=== Setup ===
+
+The driver host must be running an ssh agent and have ssh keys for
+passwordless access to all hosts except the host it is running on.  If
+you want the benchmark to hot plug cores, the user on the primary host
+must have sudo access.  A root shell is established only once at the
+beginning of a full benchmark run and reused throughout the run, so
+you should be prompted for your password at most once per run (or you
+can configure passwordless sudo access, if that doesn't make you
+cringe too much).
+
+The configuration for the benchmark is stored in config.py on the
+driver host.  This file stores static configuration information like
+host names and the locations of various files, as well as which
+benchmarks to run and the full set of data points to gather results
+for.
+
+The benchmark applications must be compiled on the primary host.  To
+do so, simply run 'make all' from the MOSBENCH checkout directory on
+the primary host.
+
+Finally, most of the benchmarks require special file system mounts.
+To construct these, run 'sudo ./mkmounts <type>' from the MOSBENCH
+checkout directory, where <type> is the file system type configured
+for the 'fs' variable in config.py.  The default is tmpfs-separate.
+Additionally, Metis in hugetlb mode requires 'sudo ./mkmounts
+hugetlbfs'.
+
+In summary,
+1. Set up ssh keys and optionally sudo access.
+2. Edit config.py on the driver host.
+3. Build the benchmark suite on the primary host.
+4. Run mkmounts on the primary host.
+
+=== Running ===
+
+Run 'make bench' on the driver host.
+
+To work out kinks while minimizing wasted time, run first with only 1
+trial (trials = 1 in config.py) and the maximum number of cores (cores
+= [#cores] in config.py).  This should run through all of the
+benchmark configurations as quickly as possible and highlight any
+configuration or setup problems.
+
+=== Analyzing results ===
+
+Each full benchmark run is stored under a results/TIMESTAMP directory
+relative to where you ran 'make bench'.  This directory contains a
+subtree where each data point is stored in a leaf directory whose path
+encodes the configuration of that data point.  If this directory also
+contains a file called 'incomplete', then the run failed before
+executing every configured data point.
+
+Each data point directory saves that point's result, its detailed
+configuration, and log files and output files from commands run by the
+benchmark.
+
+To graph benchmark results, use 'graph'.  Run graph with no arguments
+for usage information.
+
+XXX showexp
+
+
+== Troubleshooting ==
+
+If something goes wrong while running the benchmark, start by
+examining the traceback printing at the end of the benchmark.  If that
+doesn't help, scroll up; there may be another traceback embedded
+amidst earlier output.
+
+You can see which shell commands are being executed on remote hosts by
+setting LOG_COMMANDS to True in mparts/server.py.
+
+Virtually all commands execute with stderr attached to stderr on your
+terminal.  If a command fails and you expect the reason got printed to
+stdout and logged to a log file, you can find that log file on the
+host that executed that command under /tmp/mparts-UID/out/log/NAME
+where UID is a unique identifier based on where you installed MOSBENCH
+and NAME is the name of the benchmark task that executed the failing
+command.  When a benchmark completes successfully, these logs are
+copied to the driver host, but if it fails, they're left in tmp on the
+remote host.
+
+
+== Benchmark infrastructure ==
+
+The general benchmark infrastructure can be found under mparts (short
+for Moving Parts).  All of the common, but MOSBENCH-specific parts can
+be found under support.
+
+Moving Parts creates a /tmp/mparts-UID directory on each remote host,
+where UID is a unique identifier based on where MOSBENCH was installed
+(this prevents conflicts between different installations).  This
+directory contains both input files and scripts copied over from the
+driver host at the beginning of a benchmark run and output files and
+logs that will be copied back to the driver host at the end of a
+benchmark run.
+
+Each benchmark starts by rsync'ing any necessary files and scripts
+from the driver host to /tmp/mparts-UID on each remote host.  It then
+starts an RPC server on each remote host, tunneled over ssh.  This RPC
+server provides access to the remote file system and the ability to
+execute commands.  If the benchmark requires root on a given host, it
+will start a second instance of the RPC server running under sudo on
+that host.  The benchmark sets up the remote environment and executes
+any necessary commands, redirecting the majority of the output to
+files in /tmp/mparts-UID/out.  Finally, after the benchmark has
+completed, it rsync's any output files back to the driver host,
+storing them in the appropriate results subdirectory.
