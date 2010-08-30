@@ -29,7 +29,7 @@ ifeq ($(OS), SunOS)
 LIBS = -lsocket -lnsl
 endif
 
-all: smtpbm
+all: smtpbm exim-mod
 
 smtpbm: smtpbm.c
 	@echo "CC	$@"
