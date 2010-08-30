@@ -19,7 +19,7 @@ class MakeKernel(Task, ResultsProvider, SourceFileProvider):
         self.srcPath = srcPath
         self.objPath = objPath
         self.sysmon = sysmon
-        # This configuration was built using 'make defconfig'
+        # This configuration was built by 'make defconfig'
         self.__configFile = self.queueSrcFile(host, "x86_64_defconfig")
 
     def __cmd(self, target):
