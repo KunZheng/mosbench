@@ -1,4 +1,4 @@
-import sys, os, errno
+import sys, os, errno, socket, select
 
 class Progress(object):
     """A context manager that prints out progress messages before and
@@ -50,3 +50,26 @@ def relpath(path, start=os.path.curdir):
     if not rel_list:
         return os.path.curdir
     return os.path.join(*rel_list)
+
+def isLocalhost(host):
+    # Listen on a random port
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("", 0))
+    s.listen(1)
+    s.setblocking(False)
+
+    # Try to connect to that port on host.  This will come from a
+    # random port.  For some reason, we can't use a 0 timeout, so we
+    # use a really small one.
+    try:
+        c = socket.create_connection((host, s.getsockname()[1]), 0.01)
+    except socket.error:
+        return False
+
+    # We're probably good, but accept the connection and make sure it
+    # came from the right port.
+    try:
+        (a, _) = s.accept()
+    except socket.error:
+        return False
+    return a.getpeername()[1] == c.getsockname()[1]

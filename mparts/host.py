@@ -2,7 +2,7 @@ import sys, os, hashlib, subprocess, tempfile
 
 import rpc, server
 from manager import Task, ResultPath
-from util import maybeMakedirs, relpath
+from util import maybeMakedirs, relpath, isLocalhost
 from server import *
 
 __all__ = ["Host", "SourceFileProvider", "HostInfo"] + server.__all__
@@ -55,8 +55,8 @@ class SourceFileProvider(object):
         return q.setdefault(host, [])
 
 class Host(Task, SourceFileProvider):
-    """A Host provides access to a remote host and manages sending
-    source files and retrieving result files.
+    """A Host provides access to a local or remote host and manages
+    sending source files and retrieving result files.
 
     This provides an RPC stub for mparts.server.RemoteHost as the
     properties 'r' (regular user) and 'sudo' (root user), which have
@@ -79,11 +79,21 @@ class Host(Task, SourceFileProvider):
 
     def __init__(self, host, cmdModifier = None):
         """Create a Host task that will connect to the given host name
-        via ssh.  cmdModifier, if given, is a function that can modify
+        via ssh.  host must be a routable host name for any of the
+        hosts used in the experiment.  DO NOT use 'localhost'.  This
+        will automatically detect if host is the local host and forgo
+        ssh.
+
+        cmdModifier, if given, is a function that can modify
         the ssh command; it will be passed the ssh part of the
         command, the sudo part of the command, and the remote server
         execution part of the command and should return the actual
         command to execute."""
+
+        # Just a sanity check
+        if host == "localhost" or host == "127.0.0.1":
+            raise ValueError("Host name must be routable from all of the "
+                             "hosts in the experiment.")
 
         Task.__init__(self, host = host)
         self.host = host
@@ -92,6 +102,7 @@ class Host(Task, SourceFileProvider):
         self.__rConn = None
         self.__sudoConn = None
         self.__rootDir = "/tmp/mparts-%x" % abs(hash(SCRIPT_PATH))
+        self.__isLocalhost = isLocalhost(host)
 
         for p in ["__init__.py", "server.py", "rpc.py"]:
             self.queueSrcFile(self, p)
@@ -175,8 +186,9 @@ class Host(Task, SourceFileProvider):
         # preserve most things (especially not permissions, since we
         # used funky permissions to let both the regular and root user
         # share the output directory).
+        remPath = os.path.join(self.__rootDir, "out") + "/"
         cmd = ["rsync", "-rLts", "--out-format=copying %s: %%n%%L" % self.host,
-               self.host + ":" + os.path.join(self.__rootDir, "out") + "/",
+               ("" if self.__isLocalhost else self.host + ":") + remPath,
                ld]
         subprocess.check_call(cmd)
 
@@ -196,10 +208,16 @@ class Host(Task, SourceFileProvider):
         impRoot = os.path.join(self.__rootDir,
                                os.path.dirname(os.path.dirname(
                     os.path.realpath(sys.modules["mparts"].__file__))))
+        remImpRoot = os.path.join(self.__rootDir, impRoot.lstrip("/"))
 
         # ssh to the remote host
-        cmdSsh = ["ssh", self.host,
-                  "cd", os.path.join(self.__rootDir, impRoot.lstrip("/")), "&&"]
+        if self.__isLocalhost:
+            cmdSsh = []
+            cwd = remImpRoot
+        else:
+            cmdSsh = ["ssh", self.host,
+                      "cd", remImpRoot, "&&"]
+            cwd = None
         cmdSudo = ["sudo"] if sudo else []
 
         cmdRun = ["python", "-u", "-m", "mparts.server"]
@@ -212,7 +230,7 @@ class Host(Task, SourceFileProvider):
         # our host connection while cleaning up.  It's too bad we
         # can't do this after we know it's up and running.
         server = subprocess.Popen(cmd, stdin = subprocess.PIPE,
-                                  stdout = subprocess.PIPE,
+                                  stdout = subprocess.PIPE, cwd = cwd,
                                   preexec_fn = lambda: os.setpgid(0,0))
 
         # Start up RPC client
@@ -271,7 +289,12 @@ class Host(Task, SourceFileProvider):
                 cmd.append("--include=%s" % p)
                 parents.add(p)
         # Exclude anything we didn't include.
-        cmd.extend(["--exclude=*", "/", self.host + ":" + self.__rootDir])
+        cmd.extend(["--exclude=*", "/"])
+        # Whew.
+        if self.__isLocalhost:
+            cmd.append(self.__rootDir)
+        else:
+            cmd.append(self.host + ":" + self.__rootDir)
         subprocess.check_call(cmd)
 
     #
