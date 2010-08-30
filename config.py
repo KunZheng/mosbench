@@ -27,15 +27,16 @@ shared = ConfigSpace.unit()
 #    secondary hosts and gather results.  It can be run from a primary
 #    or secondary host, though doing so may perturb the results.  This
 #    host must have ssh keys set up for passwordless access to all
-#    primary and secondary hosts.
+#    hosts except the one it is running on.
 # Here we configure these hosts.  All of the host names provided here
-# must work from all of the hosts (for example, don't use
-# "localhost"), unless explicit routes are provided from every host.
+# must work from all of the hosts.  Don't use "localhost" (though the
+# driver will detect if it is running on one of these hosts and forgo
+# ssh automatically).
 
 # Use "cmdModifier = perfLocked" if you use the "perflock" script to
 # prevent conflicting machine access.  You probably don't.
-tom = Host("tom", cmdModifier = perfLocked)
-josmp = Host("josmp")
+tom = Host("tom.csail.mit.edu", cmdModifier = perfLocked)
+josmp = Host("josmp.csail.mit.edu")
 
 shared *= mk(primaryHost = tom)
 # Careful, mk treats a list as a set of alternate configurations, so
@@ -88,7 +89,8 @@ shared *= mk(trials = 3)
 # disable cores not in use by the benchmark.  All cores should be
 # re-enabled when the benchmark exits, even after an error.  Enabling
 # this requires granting the benchmark user on the primary host sudo
-# access.
+# access.  Note that the Exim benchmark REQUIRES hotplug to be
+# enabled, so either enable this or disable the Exim benchmark.
 shared *= mk(hotplug = True)
 
 # cores specifies the number of cores to use.  This must be
