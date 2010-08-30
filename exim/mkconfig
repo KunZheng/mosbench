@@ -8,7 +8,7 @@ if [ $# != 3 ]; then
 fi
 
 BASE=$(cd `dirname $0`; pwd)
-INSTALL_DIR=$BASE/$1
+INSTALL_DIR=$(cd $BASE; cd $1; pwd)
 if [ ! -f "$INSTALL_DIR/bin/exim" ]; then
     echo "No exim found in $INSTALL_DIR" >&2
     exit 1
