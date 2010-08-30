@@ -15,6 +15,8 @@ def setup():
     # Ignore USR1 and USR2, which we broadcast
     signal.signal(signal.SIGUSR1, signal.SIG_IGN)
     signal.signal(signal.SIGUSR2, signal.SIG_IGN)
+    # Get into the right directory
+    os.chdir(os.path.dirname(sys.argv[0]))
 
 def startLoad(count, port):
     # Start smtpbm
@@ -35,6 +37,7 @@ def startLoad(count, port):
 
 def startCounting(procs):
     print "Starting"
+    sys.stdout.flush()
     os.kill(0, signal.SIGUSR1)
 
 def timedWait(timeout):
@@ -78,6 +81,7 @@ def stopCounting(procs):
         signal.alarm(0)
         total += int(res.split()[0])
     print "Stopped"
+    sys.stdout.flush()
     cores = file("/proc/cpuinfo").read().count("processor\t")
     print "%d messages (%.2f messages/sec/core)" % \
         (total, float(total)/DURATION/cores)
