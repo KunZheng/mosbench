@@ -63,26 +63,36 @@ CPU_CACHE = {}
 
 __all__.append("SetCPUs")
 class SetCPUs(Task, SourceFileProvider):
-    __config__ = ["host", "num", "seq"]
+    __config__ = ["host", "num", "hotplug", "seq"]
 
-    def __init__(self, host, num, seq = "seq"):
+    def __init__(self, host, num, hotplug = True, seq = "seq"):
         Task.__init__(self, host = host)
         self.host = host
         self.num = num
+        self.hotplug = hotplug
         self.seq = seq
 
         self.__script = self.queueSrcFile(host, "set-cpus")
         self.__cpuSeq = self.queueSrcFile(host, "cpu-sequences")
 
+    def getSeq(self):
+        if self.host not in CPU_CACHE:
+            raise ValueError(
+                "Cannot get CPU sequences before SetCPUs has started")
+        return CPU_CACHE[self.host][1][self.seq][:self.num]
+
     def start(self):
         # oprofile has a habit of panicking if you hot plug CPU's
         # under it
-        self.host.sudo.run(["opcontrol", "--deinit"],
-                           wait = UNCHECKED)
+        if self.hotplug:
+            self.host.sudo.run(["opcontrol", "--deinit"],
+                               wait = UNCHECKED)
 
         if self.host not in CPU_CACHE:
-            # Make sure all CPU's are online
-            self.host.sudo.run([self.__script, "-i"], stdin = DISCARD)
+            # Make sure all CPU's are online.  If we're not allowed to
+            # hot plug, we'll just have to assume this is true.
+            if self.hotplug:
+                self.host.sudo.run([self.__script, "-i"], stdin = DISCARD)
 
             # Get CPU sequences
             p = self.host.r.run([self.__cpuSeq], stdout = CAPTURE)
@@ -98,10 +108,13 @@ class SetCPUs(Task, SourceFileProvider):
             # experiment.  We'll do our best to online all of the
             # CPU's at the end before exiting, but even if we die a
             # horrible death, hopefully this will online everything.
-            CPU_CACHE[self.host] = \
-                (self.host.sudo.run([self.__script, "-i"],
-                                    stdin = CAPTURE, wait = None),
-                 seqs)
+            if self.hotplug:
+                recover = self.host.sudo.run([self.__script, "-i"],
+                                             stdin = CAPTURE, wait = None)
+            else:
+                recover = None
+
+            CPU_CACHE[self.host] = (recover, seqs)
         else:
             seqs = CPU_CACHE[self.host][1]
 
@@ -113,8 +126,9 @@ class SetCPUs(Task, SourceFileProvider):
             raise ValueError("Requested %d cores, but only %d are available" %
                              (self.num, len(seq)))
 
-        cmd = [self.__script, ",".join(map(str, seq[:self.num]))]
-        self.host.sudo.run(cmd, wait = CHECKED)
+        if self.hotplug:
+            cmd = [self.__script, ",".join(map(str, seq[:self.num]))]
+            self.host.sudo.run(cmd, wait = CHECKED)
 
     def reset(self):
         # Synchronously re-enable all CPU's
@@ -122,8 +136,10 @@ class SetCPUs(Task, SourceFileProvider):
             return
 
         sc = CPU_CACHE[self.host][0]
-        sc.stdinClose()
-        sc.wait()
+        if sc:
+            sc.stdinClose()
+            sc.wait()
+            del CPU_CACHE[self.host]
 
 PREFETCH_CACHE = set()
 
