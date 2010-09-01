@@ -107,8 +107,9 @@ class Psearchy(object):
         files = Mkfiles(host, psearchyPath, cfg.textRoot)
         m += files
         m += PrefetchList(host, files.filesPath, reuse = True)
-        if cfg.hotplug:
-            m += SetCPUs(host = host, num = cfg.cores, seq = cfg.order)
+        # XXX Tell mkdb the CPU sequence
+        m += SetCPUs(host = host, num = cfg.cores, hotplug = cfg.hotplug,
+                     seq = cfg.order)
         sysmon = SystemMonitor(host)
         m += sysmon
         for trial in range(cfg.trials):
