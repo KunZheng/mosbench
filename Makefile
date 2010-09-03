@@ -19,10 +19,6 @@ clean-exim:
 	$(MAKE) -C exim clean
 	$(MAKE) -C exim exim-clean
 
-.PHONY: all-exim
-all-exim:
-	$(MAKE) -C exim all
-
 .PHONY: clean-gmake
 clean-gmake:
 
