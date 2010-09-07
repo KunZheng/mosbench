@@ -321,7 +321,6 @@ def generateManagers(resultRoot, configSpace):
             print "Time so far: %s\tETA: %s" % \
                 (time.strftime("%H:%M:%S", time.gmtime(now - start)),
                  time.strftime("%H:%M:%S", time.gmtime((now - start)*(len(configSpace) - n)/n)))
-        prNotice(1, "*** Starting configuration %d/%d ***" % (n+1, len(configSpace)))
 
         # Construct result path
         path = basepath
@@ -329,6 +328,8 @@ def generateManagers(resultRoot, configSpace):
             if cfgConst:
                 continue
             path = os.path.join(path, "%s-%s" % (cfgName, cfgVal))
+        prNotice(1, "*** Starting configuration %d/%d (%s) ***" % \
+                     (n+1, len(configSpace), path[len(basepath):].lstrip("/")))
 
         m = Manager()
         m += ResultPath(path, noTS = True)
