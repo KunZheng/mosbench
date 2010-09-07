@@ -131,6 +131,7 @@ psearchy = mk(benchmark = psearchy.runner, nonConst = True)
 psearchy *= (mk(mode = ["thread"]) * mk(order = ["seq"]) +
              mk(mode = ["process"]) * mk(order = ["seq", "rr"]))
 psearchy *= mk(mem = 1024)
+psearchy *= mk(dblim = 200000)
 
 ##################################################################
 # Metis
@@ -161,8 +162,8 @@ metis *= mk(order = ["rr"])
 #configSpace = (exim + gmake + psearchy + metis).merge(shared)
 #configSpace = exim.merge(shared)
 #configSpace = gmake.merge(shared)
-#configSpace = psearchy.merge(shared)
-configSpace = metis.merge(shared)
+configSpace = psearchy.merge(shared)
+#configSpace = metis.merge(shared)
 
 ##################################################################
 # Run
