@@ -38,9 +38,8 @@ def resultsTable(exps):
                                      for name in group) / rp["result"]
                                  for group in
                                  [["user", "nice"],
-                                  # XXX iowait is part of idle
-                                  ["sys", "iowait", "irq", "softirq"],
-                                  ["idle"]]) +
+                                  ["sys", "irq", "softirq"],
+                                  ["idle", "iowait"]]) +
                             (rp["unit"],))
                 haveTimes = True
             else:
