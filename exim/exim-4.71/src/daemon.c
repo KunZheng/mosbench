@@ -9,6 +9,24 @@
 
 /* Functions concerned with running Exim as a daemon */
 
+#if defined(MOSBENCH_CPU_BIND)
+#define _GNU_SOURCE
+#include <sched.h>
+
+static void bind_to_cpu(void)
+{
+  cpu_set_t cpuset;
+  int cpu;
+  
+  cpu = sched_getcpu();
+  if (cpu < 0)
+    return;
+  
+  CPU_ZERO(&cpuset);
+  CPU_SET(cpu, &cpuset);
+  sched_setaffinity(0, sizeof(cpuset), &cpuset);
+}
+#endif
 
 #include "exim.h"
 
@@ -370,6 +388,10 @@ if (pid == 0)
   struct sigaction act;
   #endif
 
+#if defined(MOSBENCH_CPU_BIND)
+  bind_to_cpu();
+#endif
+
   smtp_accept_count++;    /* So that it includes this process */
 
   /* May have been modified for the subprocess */
@@ -645,6 +667,9 @@ if (pid == 0)
 
       if ((dpid = fork()) == 0)
         {
+#if defined(MOSBENCH_CPU_BIND)
+	bind_to_cpu();
+#endif	    
         (void)fclose(smtp_in);
         (void)fclose(smtp_out);
 
