@@ -1990,19 +1990,21 @@ if (!shadowing)
     any debug output etc first. */
 
     if (running_in_test_harness) millisleep(300);
-
+#if !defined(MOSBENCH_NO_J_FILE)
     DEBUG(D_deliver) debug_printf("journalling %s", big_buffer);
     len = Ustrlen(big_buffer);
     if (write(journal_fd, big_buffer, len) != len)
       log_write(0, LOG_MAIN|LOG_PANIC, "failed to update journal for %s: %s",
         big_buffer, strerror(errno));
+#endif
     }
 
   /* Ensure the journal file is pushed out to disk. */
-
+#if !defined(MOSBENCH_NO_J_FILE)
   if (EXIMfsync(journal_fd) < 0)
     log_write(0, LOG_MAIN|LOG_PANIC, "failed to fsync journal: %s",
       strerror(errno));
+#endif
   }
 
 /* Wait for the process to finish. If it terminates with a non-zero code,
@@ -4618,6 +4620,7 @@ existence, as it will get further successful deliveries added to it in this
 run, and it will be deleted if this function gets to its end successfully.
 Otherwise it might be needed again. */
 
+#if !defined(MOSBENCH_NO_J_FILE)
 sprintf(CS spoolname, "%s/input/%s/%s-J", spool_directory, message_subdir, id);
 jread = Ufopen(spoolname, "rb");
 if (jread != NULL)
@@ -4640,7 +4643,7 @@ else if (errno != ENOENT)
     "%s", strerror(errno));
   return continue_closedown();   /* yields DELIVER_NOT_ATTEMPTED */
   }
-
+#endif
 /* A null recipients list indicates some kind of disaster. */
 
 if (recipients_list == NULL)
@@ -5925,6 +5928,7 @@ therein are added to the non-recipients. */
 
 if (addr_local != NULL || addr_remote != NULL)
   {
+#if !defined(MOSBENCH_NO_J_FILE)
   sprintf(CS spoolname, "%s/input/%s/%s-J", spool_directory, message_subdir, id);
   journal_fd = Uopen(spoolname, O_WRONLY|O_APPEND|O_CREAT, SPOOL_MODE);
 
@@ -5942,6 +5946,7 @@ if (addr_local != NULL || addr_remote != NULL)
   (void)fcntl(journal_fd, F_SETFD, fcntl(journal_fd, F_GETFD) | FD_CLOEXEC);
   (void)fchown(journal_fd, exim_uid, exim_gid);
   (void)fchmod(journal_fd, SPOOL_MODE);
+#endif
   }
 
 
@@ -6971,14 +6976,18 @@ the remove_journal flag. When the journal is left, we also don't move the
 message off the main spool if frozen and the option is set. It should get moved
 at the next attempt, after the journal has been inspected. */
 
+#if !defined(MOSBENCH_NO_J_FILE)
 if (journal_fd >= 0) (void)close(journal_fd);
+#endif
 
 if (remove_journal)
   {
+#if !defined(MOSBENCH_NO_J_FILE)
   sprintf(CS spoolname, "%s/input/%s/%s-J", spool_directory, message_subdir, id);
   if (Uunlink(spoolname) < 0 && errno != ENOENT)
     log_write(0, LOG_MAIN|LOG_PANIC_DIE, "failed to unlink %s: %s", spoolname,
       strerror(errno));
+#endif
 
   /* Move the message off the spool if reqested */
 
