@@ -50,7 +50,9 @@ typedef int IpcSemaphoreId;		/* semaphore ID returned by semget(2) */
  * per set) parameter, which is often around 25.  (Less than, because we
  * allocate one extra sema in each set for identification purposes.)
  */
-#define SEMAS_PER_SET	16
+//#define SEMAS_PER_SET	16
+#define SEMAS_PER_SET	semas_per_set
+extern int semas_per_set;		/* defined in guc.c */
 
 #define IPCProtection	(0600)	/* access/modify by user only */
 

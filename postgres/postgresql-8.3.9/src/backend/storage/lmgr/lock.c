@@ -45,6 +45,9 @@
 
 /* This configuration variable is used to set the lock table size */
 int			max_locks_per_xact; /* set by guc.c */
+int			log2_num_lock_partitions; /* set by guc.c */
+
+LWLockId   *LockMgrPartitionLocks;
 
 #define NLOCKENTS() \
 	mul_size(max_locks_per_xact, add_size(MaxBackends, max_prepared_xacts))
@@ -164,13 +167,66 @@ typedef struct TwoPhaseLockRecord
  * shared memory; LockMethodLocalHash is local to each backend.
  */
 static HTAB *LockMethodLockHash;
+#ifndef LOCK_SCALABLE
 static HTAB *LockMethodProcLockHash;
+#endif
 static HTAB *LockMethodLocalHash;
 
 
 /* private state for GrantAwaitedLock */
 static LOCALLOCK *awaitedLock;
 static ResourceOwner awaitedOwner;
+
+#ifdef LOCK_SCALABLE
+
+// Lock modes are numbered from 1, so the number of modes is actually
+// the highest numbered one.
+#define GSL_NUM_MODES AccessExclusiveLock
+
+typedef struct SLEEPARGS
+{
+	const LOCKTAG *locktag;
+	LOCKMODE lockmode;
+	LOCALLOCK  *locallock;
+	ResourceOwner owner;
+} SLEEPARGS;
+
+static void InitGSL(void)
+{
+	int			conflicts[GSL_NUM_MODES];
+	HASHCTL		info;
+	int			hash_flags;
+	int			i;
+
+	// Initialize the GSL conflict table
+	Assert(GSL_NUM_MODES <= LC_MAX_MODES);
+
+	// LockConflicts would be perfect if it weren't numbered starting
+	// from 1.  We need to shift the table up and over.
+	for (i = 0; i < GSL_NUM_MODES; ++i)
+		conflicts[i] = LockConflicts[i + 1] >> 1;
+
+	lcInitConflictTable(&LockGSLConflicts, conflicts, GSL_NUM_MODES);
+
+	// Create a per-process per-lock table.  This is *not* shared.  We
+	// can't just reuse the LOCALLOCK table, since that's also keyed
+	// on the mode.
+	if (LockGSLPerLock)
+		hash_destroy(LockGSLPerLock);
+
+	MemSet(&info, 0, sizeof(info));
+	info.keysize = sizeof(gslLock_t *);
+	info.entrysize = sizeof(GSLPERLOCK);
+	info.hash = tag_hash;
+	hash_flags = (HASH_ELEM | HASH_FUNCTION);
+
+	LockGSLPerLock = hash_create("GSLPerLock hash",
+								 128,
+								 &info,
+								 hash_flags);
+}
+
+#endif
 
 
 #ifdef LOCK_DEBUG
@@ -251,15 +307,20 @@ PROCLOCK_PRINT(const char *where, const PROCLOCK *proclockP)
 #endif   /* not LOCK_DEBUG */
 
 
+#ifndef LOCK_SCALABLE
 static uint32 proclock_hash(const void *key, Size keysize);
+#endif
 static void RemoveLocalLock(LOCALLOCK *locallock);
 static void GrantLockLocal(LOCALLOCK *locallock, ResourceOwner owner);
-static void WaitOnLock(LOCALLOCK *locallock, ResourceOwner owner);
+static void WaitOnLock(LOCALLOCK *locallock, ResourceOwner owner
+#ifdef LOCK_SCALABLE
+					   , LWLockId queueLock
+#endif
+	);
+#ifndef LOCK_SCALABLE
 static bool UnGrantLock(LOCK *lock, LOCKMODE lockmode,
 			PROCLOCK *proclock, LockMethod lockMethodTable);
-static void CleanUpLock(LOCK *lock, PROCLOCK *proclock,
-			LockMethod lockMethodTable, uint32 hashcode,
-			bool wakeupNeeded);
+#endif
 
 
 /*
@@ -281,6 +342,26 @@ InitLocks(void)
 	int			hash_flags;
 	long		init_table_size,
 				max_table_size;
+	int			i;
+
+	/*
+	 * Allocate partition LWLocks.  We don't have to allocate the
+	 * array in shared memory because we won't be modifying it, so
+	 * it's okay that everybody just has an image of it.  (XXX Not
+	 * true in EXEC_BACKEND mode?)
+	 */
+	Assert(!IsUnderPostmaster);
+	LockMgrPartitionLocks =
+		calloc(NUM_LOCK_PARTITIONS, sizeof LockMgrPartitionLocks[0]);
+	if (!LockMgrPartitionLocks)
+		ereport(FATAL,
+				(errcode(ERRCODE_OUT_OF_MEMORY),
+				 errmsg("out of memory")));
+	for (i = 0; i < NUM_LOCK_PARTITIONS; ++i) {
+		char lockName[64];
+		sprintf(lockName, "LockMgr#%d/%d", i, NUM_LOCK_PARTITIONS);
+		LockMgrPartitionLocks[i] = LWLockAssign(lockName);
+	}
 
 	/*
 	 * Compute init/max size to request for lock hashtables.  Note these
@@ -308,6 +389,7 @@ InitLocks(void)
 	if (!LockMethodLockHash)
 		elog(FATAL, "could not initialize lock hash table");
 
+#ifndef LOCK_SCALABLE
 	/* Assume an average of 2 holders per lock */
 	max_table_size *= 2;
 	init_table_size *= 2;
@@ -329,6 +411,7 @@ InitLocks(void)
 										   hash_flags);
 	if (!LockMethodProcLockHash)
 		elog(FATAL, "could not initialize proclock hash table");
+#endif
 
 	/*
 	 * Allocate non-shared hash table for LOCALLOCK structs.  This stores lock
@@ -351,6 +434,10 @@ InitLocks(void)
 									  128,
 									  &info,
 									  hash_flags);
+
+#ifdef LOCK_SCALABLE
+	InitGSL();
+#endif
 }
 
 
@@ -381,6 +468,7 @@ LockTagHashCode(const LOCKTAG *locktag)
 	return get_hash_value(LockMethodLockHash, (const void *) locktag);
 }
 
+#ifndef LOCK_SCALABLE
 /*
  * Compute the hash code associated with a PROCLOCKTAG.
  *
@@ -412,7 +500,7 @@ proclock_hash(const void *key, Size keysize)
 	 * intermediate variable to suppress cast-pointer-to-int warnings.
 	 */
 	procptr = PointerGetDatum(proclocktag->myProc);
-	lockhash ^= ((uint32) procptr) << LOG2_NUM_LOCK_PARTITIONS;
+	lockhash ^= ((uint32) procptr) << log2_num_lock_partitions;
 
 	return lockhash;
 }
@@ -433,11 +521,11 @@ ProcLockHashCode(const PROCLOCKTAG *proclocktag, uint32 hashcode)
 	 * This must match proclock_hash()!
 	 */
 	procptr = PointerGetDatum(proclocktag->myProc);
-	lockhash ^= ((uint32) procptr) << LOG2_NUM_LOCK_PARTITIONS;
+	lockhash ^= ((uint32) procptr) << log2_num_lock_partitions;
 
 	return lockhash;
 }
-
+#endif
 
 /*
  * LockAcquire -- Check for lock conflicts, sleep if conflict found,
@@ -474,8 +562,10 @@ LockAcquire(const LOCKTAG *locktag,
 	LOCALLOCKTAG localtag;
 	LOCALLOCK  *locallock;
 	LOCK	   *lock;
+#ifndef LOCK_SCALABLE
 	PROCLOCK   *proclock;
 	PROCLOCKTAG proclocktag;
+#endif
 	bool		found;
 	ResourceOwner owner;
 	uint32		hashcode;
@@ -483,6 +573,11 @@ LockAcquire(const LOCKTAG *locktag,
 	int			partition;
 	LWLockId	partitionLock;
 	int			status;
+#ifdef LOCK_SCALABLE
+	bool		holdingParitionLock = false;
+	SLEEPARGS	sleepArgs;
+	int			i;
+#endif
 
 	if (lockmethodid <= 0 || lockmethodid >= lengthof(LockMethods))
 		elog(ERROR, "unrecognized lock method: %d", lockmethodid);
@@ -520,7 +615,9 @@ LockAcquire(const LOCKTAG *locktag,
 	if (!found)
 	{
 		locallock->lock = NULL;
+#ifndef LOCK_SCALABLE
 		locallock->proclock = NULL;
+#endif
 		locallock->hashcode = LockTagHashCode(&(localtag.lock));
 		locallock->nLocks = 0;
 		locallock->numLockOwners = 0;
@@ -560,6 +657,66 @@ LockAcquire(const LOCKTAG *locktag,
 	partition = LockHashPartition(hashcode);
 	partitionLock = LockHashPartitionLock(hashcode);
 
+#ifdef LOCK_SCALABLE
+	/*
+	 * The old code relies on the partition lock to hold off
+	 * cancel/die interrupts.  Since we're frequently not holding any
+	 * lwlocks, we manage interrupts manually.  We need to start
+	 * holding off interrupts here to prevent pin count corruption.
+	 */
+	HOLD_INTERRUPTS();
+
+	LWLockAcquire(partitionLock, LW_SHARED);
+
+	/*
+	 * Find or create a lock with this tag.
+	 *
+	 * Note: if the locallock object already existed, it might have a pointer
+	 * to the lock already ... but we probably should not assume that that
+	 * pointer is valid, since a lock object with no locks can go away
+	 * anytime.
+	 */
+	lock = (LOCK *) hash_search_with_hash_value(LockMethodLockHash,
+												(void *) locktag,
+												hashcode,
+												HASH_FIND,
+												&found);
+
+	/*
+	 * Pin the lock before releasing the partition lock to prevent GC
+	 */
+	if (found)
+		LockPin(lock);
+
+	LWLockRelease(partitionLock);
+
+	if (!found)
+	{
+		/*
+		 * We need to create the lock.  Another process may have
+		 * created it while we weren't holding the partition lock, but
+		 * that's okay.
+		 */
+		LWLockAcquire(partitionLock, LW_EXCLUSIVE);
+		holdingParitionLock = true;
+
+		lock = (LOCK *) hash_search_with_hash_value(LockMethodLockHash,
+													(void *) locktag,
+													hashcode,
+													HASH_ENTER_NULL,
+													&found);
+		if (!lock)
+		{
+			LWLockRelease(partitionLock);
+			ereport(ERROR,
+					(errcode(ERRCODE_OUT_OF_MEMORY),
+					 errmsg("out of shared memory"),
+			  errhint("You might need to increase max_locks_per_transaction.")));
+		}
+	}
+
+#else
+
 	LWLockAcquire(partitionLock, LW_EXCLUSIVE);
 
 	/*
@@ -583,6 +740,9 @@ LockAcquire(const LOCKTAG *locktag,
 				 errmsg("out of shared memory"),
 		  errhint("You might need to increase max_locks_per_transaction.")));
 	}
+
+#endif
+
 	locallock->lock = lock;
 
 	/*
@@ -590,6 +750,14 @@ LockAcquire(const LOCKTAG *locktag,
 	 */
 	if (!found)
 	{
+#ifdef LOCK_SCALABLE
+		LWLockId *gslLock;
+		gslLockInit(&lock->gsl, &gslLock);
+		// XXX I'm pretty sure this doesn't have to be the partition
+		// lock.  I don't think the sleep or wake paths require the
+		// partition lock specifically.
+		*gslLock = partitionLock;
+#else
 		lock->grantMask = 0;
 		lock->waitMask = 0;
 		SHMQueueInit(&(lock->procLocks));
@@ -598,16 +766,72 @@ LockAcquire(const LOCKTAG *locktag,
 		lock->nGranted = 0;
 		MemSet(lock->requested, 0, sizeof(int) * MAX_LOCKMODES);
 		MemSet(lock->granted, 0, sizeof(int) * MAX_LOCKMODES);
+#endif
 		LOCK_PRINT("LockAcquire: new", lock, lockmode);
 	}
 	else
 	{
 		LOCK_PRINT("LockAcquire: found", lock, lockmode);
+#ifndef LOCK_SCALABLE
 		Assert((lock->nRequested >= 0) && (lock->requested[lockmode] >= 0));
 		Assert((lock->nGranted >= 0) && (lock->granted[lockmode] >= 0));
 		Assert(lock->nGranted <= lock->nRequested);
+#endif
 	}
 
+#ifdef LOCK_SCALABLE
+	/*
+	 * If we took out the partition lock to create the lock, then pin
+	 * the lock and release the partition lock here.
+	 */
+	if (holdingParitionLock) {
+		LockPin(lock);
+		LWLockRelease(partitionLock);
+	}
+#endif
+
+#ifdef LOCK_SCALABLE
+	/* Set up for a call to sleep */
+	sleepArgs.locktag = locktag;
+	sleepArgs.lockmode = lockmode;
+	sleepArgs.locallock = locallock;
+	sleepArgs.owner = owner;
+
+	/*
+	 * Acquire the lock.  This may not return if we get interrupted.
+	 * ProcSleep will take care of our pin count so we don't leave
+	 * behind a pin if we get interrupted.
+	 */
+	status = gslAcquire(&lock->gsl, lockmode - 1, dontWait, &sleepArgs) ?
+		LOCKACQUIRE_OK : LOCKACQUIRE_NOT_AVAIL;
+
+	/* Now that it's acquired, I don't need to pin it */
+	LockUnpin(lock);
+
+	/* We can accept interrupts again */
+	RESUME_INTERRUPTS();
+
+	/* Did I get it? */
+	if (status == LOCKACQUIRE_OK) {
+		/*
+		 * XXX Check that we actually got the lock?  In GSL, there's
+		 * nothing that indicates I have the lock that I didn't set
+		 * myself, so this seems somewhat pointless.
+		 */
+		/*
+		 * Unlike in the original code path, ProcSleep doesn't grant
+		 * the awaited lock, which means we should grant it here
+		 * regardless of whether we had to go to sleep or not.
+		 */
+		GrantLockLocal(locallock, owner);
+		LOCK_PRINT("LockAcquire: granted", lock, lockmode);
+	} else {
+		LOCK_PRINT("LockAcquire: conditional lock failed", lock, lockmode);
+		if (locallock->nLocks == 0)
+			RemoveLocalLock(locallock);
+	}
+	return status;
+#else
 	/*
 	 * Create the hash key for the proclock table.
 	 */
@@ -818,6 +1042,7 @@ LockAcquire(const LOCKTAG *locktag,
 	LWLockRelease(partitionLock);
 
 	return LOCKACQUIRE_OK;
+#endif
 }
 
 /*
@@ -834,6 +1059,7 @@ RemoveLocalLock(LOCALLOCK *locallock)
 		elog(WARNING, "locallock table corrupted");
 }
 
+#ifndef LOCK_SCALABLE
 /*
  * LockCheckConflicts -- test whether requested lock conflicts
  *		with those already granted
@@ -904,7 +1130,9 @@ LockCheckConflicts(LockMethod lockMethodTable,
 	PROCLOCK_PRINT("LockCheckConflicts: conflicting", proclock);
 	return STATUS_FOUND;
 }
+#endif
 
+#ifndef LOCK_SCALABLE
 /*
  * GrantLock -- update the lock and proclock data structures to show
  *		the lock request has been granted.
@@ -929,7 +1157,9 @@ GrantLock(LOCK *lock, PROCLOCK *proclock, LOCKMODE lockmode)
 	Assert((lock->nGranted > 0) && (lock->granted[lockmode] > 0));
 	Assert(lock->nGranted <= lock->nRequested);
 }
+#endif
 
+#ifndef LOCK_SCALABLE
 /*
  * UnGrantLock -- opposite of GrantLock.
  *
@@ -985,6 +1215,7 @@ UnGrantLock(LOCK *lock, LOCKMODE lockmode,
 
 	return wakeupNeeded;
 }
+#endif
 
 /*
  * CleanUpLock -- clean up after releasing a lock.	We garbage-collect the
@@ -996,11 +1227,20 @@ UnGrantLock(LOCK *lock, LOCKMODE lockmode,
  * The appropriate partition lock must be held at entry, and will be
  * held at exit.
  */
-static void
-CleanUpLock(LOCK *lock, PROCLOCK *proclock,
-			LockMethod lockMethodTable, uint32 hashcode,
-			bool wakeupNeeded)
+void
+CleanUpLock(LOCK *lock,
+#ifndef LOCK_SCALABLE
+			PROCLOCK *proclock, LockMethod lockMethodTable,
+#endif
+			uint32 hashcode,
+#ifndef LOCK_SCALABLE
+			bool wakeupNeeded
+#else
+			bool lastLocalHold, bool lastHold
+#endif
+	)
 {
+#ifndef LOCK_SCALABLE
 	/*
 	 * If this was my last hold on this lock, delete my entry in the proclock
 	 * table.
@@ -1020,27 +1260,129 @@ CleanUpLock(LOCK *lock, PROCLOCK *proclock,
 										 NULL))
 			elog(PANIC, "proclock table corrupted");
 	}
+#endif
 
+#ifdef LOCK_SCALABLE
+	LWLockId partitionLock = LockHashPartitionLock(hashcode);
+	int pins;
+
+	if (lastLocalHold) {
+		/*
+		 * Garbage collect the GSL perlock object
+		 */
+		bool found;
+		gslLock_t *gslLock = &lock->gsl;
+		hash_search(LockGSLPerLock, (void*)&gslLock, HASH_REMOVE, &found);
+		if (!found) {
+			elog(ERROR, "Local GSL perlock table corrupted");
+		}
+	}
+
+	if (!lastHold) {
+		/* There's no point in checking if I should GC */
+		LockUnpin(lock);
+		return;
+	}
+
+	// XXX What if two procs release the same lock, then come here,
+	// *both* see that nobody is holding the lock, then both delete
+	// it?  Maybe gslRelease has to indicate whether it was the last
+	// holder (and there are no waiters).  No, that's not enough
+	// either.
+	//  A releases - last holder
+	//  B acquires
+	//  B releases - last holder
+	//  A enters CleanUpLock
+	//  B enters CleanUpLock
+	// Ugh.  Can I use pins to protect this, too?  Or am I just
+	// screwed because the lock could be deleted before release even
+	// returns?  What if I pin before releasing?
+	//  A pins
+	//  A releases - last holder
+	//  B acquires
+	//  B pins
+	//  B releases - last holder
+	//  A enters CleanUpLock, sees pins > 1, unpins, returns
+	//  B enters CleanUpLock, sees pins = 1, deletes
+
+	/*
+	 * Was this the last hold on the lock and is nobody in the process
+	 * of acquiring it?  We check this optimistically first and do the
+	 * cheaper check first (though they're both cheap).
+	 */
+	// XXX Not convinced this is safe
+	/* 
+     * if (lock->pins != 0 || gslAnyHolding(&lock->gsl)) {
+	 * 	/\*
+	 * 	 * The lock is still held or is about to be.
+	 * 	 *\/
+	 * 	return;
+	 * }
+     */
+
+	/*
+	 * Now we take out the partition lock and check again.  We need
+	 * the partition lock anyway to remove it from the hash table.
+	 */
+	LWLockAcquire(partitionLock, LW_EXCLUSIVE);
+
+	/* Now that we've got the partition lock, we don't need the pin */
+	pins = LockUnpin(lock);
+
+	/*
+	 * Now that we're holding the exclusive partition lock, every
+	 * acquiring process will either
+	 *  1) Not have reached the partition lock yet, and will thus
+	 *     block.
+	 *  2) Will have upped the pin count and released the partition
+	 *     lock.  This can transition at any time to 3.
+	 *  3) Will have acquired the lock and downed the pin count.
+	 * Every releasing process will either
+	 *  4) Will have upped the pin count, but still hold the lock.
+	 *     This can transition at any time to 5.
+	 *  5) Will have upped the pin count and released the lock.
+	 *  XXX
+	 * Thus, as long as I check the pin count first, I can safely
+	 * detect cases 2 and 3, even though they aren't holding the
+	 * partition lock.
+	 */
+	if (pins > 0 || gslAnyHolding(&lock->gsl)) {
+		LWLockRelease(partitionLock);
+		return;
+	}
+
+	/*
+	 * Now I know nobody is holding the lock or about to hold the
+	 * lock, so I can delete it.
+	 */
+#else
 	if (lock->nRequested == 0)
 	{
+#endif
 		/*
 		 * The caller just released the last lock, so garbage-collect the lock
 		 * object.
 		 */
 		LOCK_PRINT("CleanUpLock: deleting", lock, 0);
+#ifndef LOCK_SCALABLE
 		Assert(SHMQueueEmpty(&(lock->procLocks)));
+#endif
 		if (!hash_search_with_hash_value(LockMethodLockHash,
 										 (void *) &(lock->tag),
 										 hashcode,
 										 HASH_REMOVE,
 										 NULL))
 			elog(PANIC, "lock table corrupted");
+#ifdef LOCK_SCALABLE
+		LWLockRelease(partitionLock);
+#else
 	}
 	else if (wakeupNeeded)
 	{
 		/* There are waiters on this lock, so wake them up. */
 		ProcLockWakeup(lockMethodTable, lock);
 	}
+#endif
 }
 
 /*
@@ -1089,6 +1431,19 @@ GrantAwaitedLock(void)
 	GrantLockLocal(awaitedLock, awaitedOwner);
 }
 
+#ifdef LOCK_SCALABLE
+void GSL_ACQUIRE_SLEEP(LWLockId *m, void *opaque)
+{
+	SLEEPARGS *a = opaque;
+
+	PG_TRACE2(lock__startwait, a->locktag->locktag_field2, a->lockmode);
+
+	WaitOnLock(a->locallock, a->owner, *m);
+
+	PG_TRACE2(lock__endwait, a->locktag->locktag_field2, a->lockmode);
+}
+#endif
+
 /*
  * WaitOnLock -- wait to acquire a lock
  *
@@ -1098,7 +1453,11 @@ GrantAwaitedLock(void)
  * The appropriate partition lock must be held at entry.
  */
 static void
-WaitOnLock(LOCALLOCK *locallock, ResourceOwner owner)
+WaitOnLock(LOCALLOCK *locallock, ResourceOwner owner
+#ifdef LOCK_SCALABLE
+		   , LWLockId queueLock
+#endif
+	)
 {
 	LOCKMETHODID lockmethodid = LOCALLOCK_LOCKMETHOD(*locallock);
 	LockMethod	lockMethodTable = LockMethods[lockmethodid];
@@ -1144,7 +1503,11 @@ WaitOnLock(LOCALLOCK *locallock, ResourceOwner owner)
 	 */
 	PG_TRY();
 	{
-		if (ProcSleep(locallock, lockMethodTable) != STATUS_OK)
+		if (ProcSleep(locallock, lockMethodTable
+#ifdef LOCK_SCALABLE
+					  , queueLock
+#endif
+				) != STATUS_OK)
 		{
 			/*
 			 * We failed as a result of a deadlock, see CheckDeadLock().
@@ -1153,7 +1516,13 @@ WaitOnLock(LOCALLOCK *locallock, ResourceOwner owner)
 			awaitedLock = NULL;
 			LOCK_PRINT("WaitOnLock: aborting on lock",
 					   locallock->lock, locallock->tag.mode);
+#ifdef LOCK_SCALABLE
+			/* ProcSleep always releases the queue lock, but also
+			 * always leaves interrupts disabled */
+			RESUME_INTERRUPTS();
+#else
 			LWLockRelease(LockHashPartitionLock(locallock->hashcode));
+#endif
 
 			/*
 			 * Now that we aren't holding the partition lock, we can give an
@@ -1194,6 +1563,9 @@ WaitOnLock(LOCALLOCK *locallock, ResourceOwner owner)
 			   locallock->lock, locallock->tag.mode);
 }
 
+#ifndef LOCK_SCALABLE  /* NOTE: Still need to proc->waitLock = NULL
+						* and CleanUpLock. XXX Keep this function
+						* just for those? */
 /*
  * Remove a proc from the wait-queue it is on (caller must know it is on one).
  * This is only used when the proc has failed to get the lock, so we set its
@@ -1249,6 +1621,7 @@ RemoveFromWaitQueue(PGPROC *proc, uint32 hashcode)
 				LockMethods[lockmethodid], hashcode,
 				true);
 }
+#endif
 
 /*
  * LockRelease -- look up 'locktag' and release one 'lockmode' lock on it.
@@ -1272,6 +1645,9 @@ LockRelease(const LOCKTAG *locktag, LOCKMODE lockmode, bool sessionLock)
 	PROCLOCK   *proclock;
 	LWLockId	partitionLock;
 	bool		wakeupNeeded;
+#ifdef LOCK_SCALABLE
+	bool		lastLocalHold, lastHold;
+#endif
 
 	if (lockmethodid <= 0 || lockmethodid >= lengthof(LockMethods))
 		elog(ERROR, "unrecognized lock method: %d", lockmethodid);
@@ -1354,6 +1730,29 @@ LockRelease(const LOCKTAG *locktag, LOCKMODE lockmode, bool sessionLock)
 	if (locallock->nLocks > 0)
 		return TRUE;
 
+#ifdef LOCK_SCALABLE
+	/*
+	 * We don't need to re-find the lock or proclock, since we kept their
+	 * addresses in the locallock table, and they couldn't have been removed
+	 * while we were holding a lock on them.
+	 */
+	lock = locallock->lock;
+	LOCK_PRINT("LockRelease: found", lock, lockmode);
+
+	/* Pin the lock for cleanup */
+	LockPin(lock);
+
+	// XXX gslRelease will panic if we're not holding the lock,
+	// whereas below just issues a warning.  I could change that, but
+	// when does this actually come up?
+	gslRelease(&lock->gsl, lockmode - 1, &lastLocalHold, &lastHold);
+
+	CleanUpLock(lock, locallock->hashcode, lastLocalHold, lastHold);
+
+	RemoveLocalLock(locallock);
+	return TRUE;
+#else
+
 	/*
 	 * Otherwise we've got to mess with the shared lock table.
 	 */
@@ -1398,6 +1797,7 @@ LockRelease(const LOCKTAG *locktag, LOCKMODE lockmode, bool sessionLock)
 
 	RemoveLocalLock(locallock);
 	return TRUE;
+#endif
 }
 
 /*
@@ -1442,7 +1842,11 @@ LockReleaseAll(LOCKMETHODID lockmethodid, bool allLocks)
 
 	while ((locallock = (LOCALLOCK *) hash_seq_search(&status)) != NULL)
 	{
-		if (locallock->proclock == NULL || locallock->lock == NULL)
+		if (
+#ifndef LOCK_SCALABLE
+			locallock->proclock == NULL ||
+#endif
+			locallock->lock == NULL)
 		{
 			/*
 			 * We must've run out of shared memory while trying to set up this
@@ -1489,19 +1893,34 @@ LockReleaseAll(LOCKMETHODID lockmethodid, bool allLocks)
 		}
 
 		/* Mark the proclock to show we need to release this lockmode */
-		if (locallock->nLocks > 0)
+		if (locallock->nLocks > 0) {
+#ifdef LOCK_SCALABLE
+			/*
+			 * Go ahead and release the lock.  It would be nice if we
+			 * batch release each partition and only take the
+			 * partition lock once per partition if there are any
+			 * procs to wake.
+			 */
+			bool lastLocalHold, lastHold;
+			LockPin(locallock->lock);
+			gslRelease(&locallock->lock->gsl, locallock->tag.mode - 1, &lastLocalHold, &lastHold);
+			CleanUpLock(locallock->lock, locallock->hashcode, lastLocalHold, lastHold);
+#else
 			locallock->proclock->releaseMask |= LOCKBIT_ON(locallock->tag.mode);
+#endif
+		}
 
 		/* And remove the locallock hashtable entry */
 		RemoveLocalLock(locallock);
 	}
 
+#ifndef LOCK_SCALABLE
 	/*
 	 * Now, scan each lock partition separately.
 	 */
 	for (partition = 0; partition < NUM_LOCK_PARTITIONS; partition++)
 	{
-		LWLockId	partitionLock = FirstLockMgrLock + partition;
+		LWLockId	partitionLock = LockMgrPartitionLocks[partition];
 		SHM_QUEUE  *procLocks = &(MyProc->myProcLocks[partition]);
 
 		proclock = (PROCLOCK *) SHMQueueNext(procLocks, procLocks,
@@ -1580,6 +1999,7 @@ LockReleaseAll(LOCKMETHODID lockmethodid, bool allLocks)
 
 		LWLockRelease(partitionLock);
 	}							/* loop over partitions */
+#endif
 
 #ifdef LOCK_DEBUG
 	if (*(lockMethodTable->trace_flag))
@@ -1723,6 +2143,11 @@ LockReassignCurrentOwner(void)
 VirtualTransactionId *
 GetLockConflicts(const LOCKTAG *locktag, LOCKMODE lockmode)
 {
+#ifdef LOCK_SCALABLE
+	/* This function is used only for concurrent index builds */
+	elog(ERROR, "GetLockConflicts not yet implemented for LOCK_SCALABLE");
+	return NULL;
+#else
 	VirtualTransactionId *vxids;
 	LOCKMETHODID lockmethodid = locktag->locktag_lockmethodid;
 	LockMethod	lockMethodTable;
@@ -1814,6 +2239,7 @@ GetLockConflicts(const LOCKTAG *locktag, LOCKMODE lockmode)
 		elog(PANIC, "too many conflicting locks found");
 
 	return vxids;
+#endif
 }
 
 
@@ -1900,6 +2326,9 @@ AtPrepare_Locks(void)
 void
 PostPrepare_Locks(TransactionId xid)
 {
+#ifdef LOCK_SCALABLE
+	elog(ERROR, "Prepare not yet supported with LOCK_SCALABLE");
+#else
 	PGPROC	   *newproc = TwoPhaseGetDummyProc(xid);
 	HASH_SEQ_STATUS status;
 	LOCALLOCK  *locallock;
@@ -1959,7 +2388,7 @@ PostPrepare_Locks(TransactionId xid)
 	 */
 	for (partition = 0; partition < NUM_LOCK_PARTITIONS; partition++)
 	{
-		LWLockId	partitionLock = FirstLockMgrLock + partition;
+		LWLockId	partitionLock = LockMgrPartitionLocks[partition];
 		SHM_QUEUE  *procLocks = &(MyProc->myProcLocks[partition]);
 
 		proclock = (PROCLOCK *) SHMQueueNext(procLocks, procLocks,
@@ -2074,6 +2503,7 @@ PostPrepare_Locks(TransactionId xid)
 	}							/* loop over partitions */
 
 	END_CRIT_SECTION();
+#endif
 }
 
 
@@ -2101,6 +2531,19 @@ LockShmemSize(void)
 
 	return size;
 }
+
+#ifndef LOCK_SCALABLE
+/*
+ * This is unfortunate.  With the current implementation
+ * LOCK_SCALABLE, there's no way to find out what locks other procs
+ * are holding.  However, this is not a fundamental limitation.  It
+ * can even be fixed in a scalable way by creating an array of shared
+ * hash tables, one per possible backend, for recording the per-proc
+ * per-lock information this needs.  Each process would have to lock
+ * its hash table to manipulate it, but, unless someone's reading the
+ * global lock status, there will be no contention for acquiring that
+ * lock.
+ */
 
 /*
  * GetLockStatusData - Return a summary of the lock manager's internal
@@ -2142,7 +2585,7 @@ GetLockStatusData(void)
 	 * Must grab LWLocks in partition-number order to avoid LWLock deadlock.
 	 */
 	for (i = 0; i < NUM_LOCK_PARTITIONS; i++)
-		LWLockAcquire(FirstLockMgrLock + i, LW_SHARED);
+		LWLockAcquire(LockMgrPartitionLocks[i], LW_SHARED);
 
 	/* Now we can safely count the number of proclocks */
 	els = hash_get_num_entries(LockMethodProcLockHash);
@@ -2176,12 +2619,13 @@ GetLockStatusData(void)
 	 * behavior inside LWLockRelease.
 	 */
 	for (i = NUM_LOCK_PARTITIONS; --i >= 0;)
-		LWLockRelease(FirstLockMgrLock + i);
+		LWLockRelease(LockMgrPartitionLocks[i]);
 
 	Assert(el == data->nelements);
 
 	return data;
 }
+#endif
 
 /* Provide the textual name of any lock mode */
 const char *
@@ -2283,6 +2727,9 @@ void
 lock_twophase_recover(TransactionId xid, uint16 info,
 					  void *recdata, uint32 len)
 {
+#ifdef LOCK_SCALABLE
+	elog(ERROR, "2PC not yet supported with LOCK_SCALABLE");
+#else
 	TwoPhaseLockRecord *rec = (TwoPhaseLockRecord *) recdata;
 	PGPROC	   *proc = TwoPhaseGetDummyProc(xid);
 	LOCKTAG    *locktag;
@@ -2437,6 +2884,7 @@ lock_twophase_recover(TransactionId xid, uint16 info,
 	GrantLock(lock, proclock, lockmode);
 
 	LWLockRelease(partitionLock);
+#endif
 }
 
 /*
@@ -2448,6 +2896,9 @@ void
 lock_twophase_postcommit(TransactionId xid, uint16 info,
 						 void *recdata, uint32 len)
 {
+#ifdef LOCK_SCALABLE
+	elog(ERROR, "2PC not yet supported with LOCK_SCALABLE");
+#else
 	TwoPhaseLockRecord *rec = (TwoPhaseLockRecord *) recdata;
 	PGPROC	   *proc = TwoPhaseGetDummyProc(xid);
 	LOCKTAG    *locktag;
@@ -2526,6 +2977,7 @@ lock_twophase_postcommit(TransactionId xid, uint16 info,
 				wakeupNeeded);
 
 	LWLockRelease(partitionLock);
+#endif
 }
 
 /*

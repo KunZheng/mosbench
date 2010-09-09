@@ -107,6 +107,9 @@ typedef struct GlobalTransactionData
 {
 	PGPROC		proc;			/* dummy proc */
 	BackendId	dummyBackendId;	/* similar to backend id for backends */
+#ifndef LOCK_SCALABLE
+	SHM_QUEUE  *myProcLocks;	/* myProcLocks to use for proc */
+#endif
 	TimestampTz prepared_at;	/* time of preparation */
 	XLogRecPtr	prepare_lsn;	/* XLOG offset of prepare record */
 	Oid			owner;			/* ID of user that executed the xact */
@@ -137,6 +140,7 @@ typedef struct TwoPhaseStateData
 static TwoPhaseStateData *TwoPhaseState;
 
 
+static Size TwoPhaseShmemProcLocksSize(void);
 static void RecordTransactionCommitPrepared(TransactionId xid,
 								int nchildren,
 								TransactionId *children,
@@ -166,8 +170,21 @@ TwoPhaseShmemSize(void)
 	size = MAXALIGN(size);
 	size = add_size(size, mul_size(max_prepared_xacts,
 								   sizeof(GlobalTransactionData)));
+	size = MAXALIGN(size);
+	size = add_size(size, TwoPhaseShmemProcLocksSize());
 
 	return size;
+}
+
+static Size
+TwoPhaseShmemProcLocksSize(void)
+{
+#ifdef LOCK_SCALABLE
+	return 0;
+#else
+	return mul_size(max_prepared_xacts * NUM_LOCK_PARTITIONS,
+					sizeof MyProc->myProcLocks[0]);
+#endif
 }
 
 void
@@ -176,7 +193,7 @@ TwoPhaseShmemInit(void)
 	bool		found;
 
 	TwoPhaseState = ShmemInitStruct("Prepared Transaction Table",
-									TwoPhaseShmemSize(),
+									TwoPhaseShmemSize() - TwoPhaseShmemProcLocksSize(),
 									&found);
 	if (!IsUnderPostmaster)
 	{
@@ -197,6 +214,10 @@ TwoPhaseShmemInit(void)
 		for (i = 0; i < max_prepared_xacts; i++)
 		{
 			gxacts[i].proc.links.next = TwoPhaseState->freeGXacts;
+#ifndef LOCK_SCALABLE
+			gxacts[i].myProcLocks =
+				ShmemAlloc(NUM_LOCK_PARTITIONS * sizeof gxacts[i].myProcLocks[0]);
+#endif
 			TwoPhaseState->freeGXacts = MAKE_OFFSET(&gxacts[i]);
 
 			/*
@@ -304,9 +325,12 @@ MarkAsPreparing(TransactionId xid, const char *gid,
 	gxact->proc.lwExclusive = false;
 	gxact->proc.lwWaitLink = NULL;
 	gxact->proc.waitLock = NULL;
+#ifndef LOCK_SCALABLE
 	gxact->proc.waitProcLock = NULL;
+	gxact->proc.myProcLocks = gxact->myProcLocks;
 	for (i = 0; i < NUM_LOCK_PARTITIONS; i++)
 		SHMQueueInit(&(gxact->proc.myProcLocks[i]));
+#endif
 	/* subxid data must be filled later by GXactLoadSubxactData */
 	gxact->proc.subxids.overflowed = false;
 	gxact->proc.subxids.nxids = 0;

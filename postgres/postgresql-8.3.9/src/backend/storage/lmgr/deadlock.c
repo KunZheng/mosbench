@@ -64,6 +64,7 @@ typedef struct
 } DEADLOCK_INFO;
 
 
+#ifndef LOCK_SCALABLE
 static bool DeadLockCheckRecurse(PGPROC *proc);
 static int	TestConfiguration(PGPROC *startProc);
 static bool FindLockCycle(PGPROC *checkProc,
@@ -73,6 +74,7 @@ static bool FindLockCycleRecurse(PGPROC *checkProc, int depth,
 static bool ExpandConstraints(EDGE *constraints, int nConstraints);
 static bool TopoSort(LOCK *lock, EDGE *constraints, int nConstraints,
 		 PGPROC **ordering);
+#endif
 
 #ifdef DEBUG_DEADLOCK
 static void PrintLockQueue(LOCK *lock, const char *info);
@@ -183,6 +185,7 @@ InitDeadLockChecking(void)
 	MemoryContextSwitchTo(oldcxt);
 }
 
+#ifndef LOCK_SCALABLE
 /*
  * DeadLockCheck -- Checks for deadlocks for a given process
  *
@@ -266,6 +269,7 @@ DeadLockCheck(PGPROC *proc)
 	else
 		return DS_NO_DEADLOCK;
 }
+#endif
 
 /*
  * Return the PGPROC of the autovacuum that's blocking a process.
@@ -283,6 +287,7 @@ GetBlockingAutoVacuumPgproc(void)
 	return ptr;
 }
 
+#ifndef LOCK_SCALABLE
 /*
  * DeadLockCheckRecurse -- recursively search for valid orderings
  *
@@ -850,6 +855,7 @@ TopoSort(LOCK *lock,
 	/* Done */
 	return true;
 }
+#endif
 
 #ifdef DEBUG_DEADLOCK
 static void

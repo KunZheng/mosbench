@@ -179,6 +179,7 @@ SimpleLruInit(SlruCtl ctl, const char *name, int nslots, int nlsns,
 {
 	SlruShared	shared;
 	bool		found;
+	char		lockName[64];
 
 	shared = (SlruShared) ShmemInitStruct(name,
 										  SimpleLruShmemSize(nslots, nlsns),
@@ -232,7 +233,8 @@ SimpleLruInit(SlruCtl ctl, const char *name, int nslots, int nlsns,
 			shared->page_status[slotno] = SLRU_PAGE_EMPTY;
 			shared->page_dirty[slotno] = false;
 			shared->page_lru_count[slotno] = 0;
-			shared->buffer_locks[slotno] = LWLockAssign();
+			sprintf(lockName, "SimpleLru#%d/%d", slotno, nslots);
+			shared->buffer_locks[slotno] = LWLockAssign(lockName);
 			ptr += BLCKSZ;
 		}
 	}

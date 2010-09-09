@@ -15,17 +15,13 @@
 #define LWLOCK_H
 
 /*
- * It's a bit odd to declare NUM_BUFFER_PARTITIONS and NUM_LOCK_PARTITIONS
- * here, but we need them to set up enum LWLockId correctly, and having
- * this file include lock.h or bufmgr.h would be backwards.
+ * It's a bit odd to declare NUM_BUFFER_PARTITIONS here, but we need
+ * them to set up enum LWLockId correctly, and having this file
+ * include lock.h or bufmgr.h would be backwards.
  */
 
 /* Number of partitions of the shared buffer mapping hashtable */
 #define NUM_BUFFER_PARTITIONS  16
-
-/* Number of partitions the shared lock tables are divided into */
-#define LOG2_NUM_LOCK_PARTITIONS  4
-#define NUM_LOCK_PARTITIONS  (1 << LOG2_NUM_LOCK_PARTITIONS)
 
 /*
  * We have a number of predefined LWLocks, plus a bunch of LWLocks that are
@@ -63,12 +59,12 @@ typedef enum LWLockId
 	AutovacuumLock,
 	AutovacuumScheduleLock,
 	SyncScanLock,
+	LoggingLock,				/* Austin: Prevent logging collisions */
 	/* Individual lock IDs end here */
 	FirstBufMappingLock,
-	FirstLockMgrLock = FirstBufMappingLock + NUM_BUFFER_PARTITIONS,
 
 	/* must be last except for MaxDynamicLWLock: */
-	NumFixedLWLocks = FirstLockMgrLock + NUM_LOCK_PARTITIONS,
+	NumFixedLWLocks = FirstBufMappingLock + NUM_BUFFER_PARTITIONS,
 
 	MaxDynamicLWLock = 1000000000
 } LWLockId;
@@ -85,7 +81,7 @@ typedef enum LWLockMode
 extern bool Trace_lwlocks;
 #endif
 
-extern LWLockId LWLockAssign(void);
+extern LWLockId LWLockAssign(const char *name);
 extern void LWLockAcquire(LWLockId lockid, LWLockMode mode);
 extern bool LWLockConditionalAcquire(LWLockId lockid, LWLockMode mode);
 extern void LWLockRelease(LWLockId lockid);

@@ -2936,6 +2936,9 @@ BeginTransactionBlock(void)
 bool
 PrepareTransactionBlock(char *gid)
 {
+#ifdef LOCK_SCALABLE
+	elog(ERROR, "PREPARE not yet supported with LOCK_SCALABLE");
+#endif
 	TransactionState s;
 	bool		result;
 

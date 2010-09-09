@@ -32,6 +32,36 @@ typedef struct timeval instr_time;
 #define INSTR_TIME_SET_CURRENT(t)	gettimeofday(&(t), NULL)
 #define INSTR_TIME_GET_DOUBLE(t) \
 	(((double) (t).tv_sec) + ((double) (t).tv_usec) / 1000000.0)
+
+#define INSTR_TIME_SUBTRACT(x,y) \
+ do { \
+  (x).tv_sec -= (y).tv_sec; \
+  (x).tv_usec -= (y).tv_usec; \
+  /* Normalize */ \
+  while ((x).tv_usec < 0) \
+  { \
+   (x).tv_usec += 1000000; \
+   (x).tv_sec--; \
+  } \
+ } while (0)
+
+#define INSTR_TIME_ACCUM_DIFF(x,y,z) \
+ do { \
+  (x).tv_sec += (y).tv_sec - (z).tv_sec; \
+  (x).tv_usec += (y).tv_usec - (z).tv_usec; \
+  /* Normalize after each add to avoid overflow/underflow of tv_usec */ \
+  while ((x).tv_usec < 0) \
+  { \
+   (x).tv_usec += 1000000; \
+   (x).tv_sec--; \
+  } \
+  while ((x).tv_usec >= 1000000) \
+  { \
+   (x).tv_usec -= 1000000; \
+   (x).tv_sec++; \
+  } \
+ } while (0)
+
 #else							/* WIN32 */
 
 typedef LARGE_INTEGER instr_time;

@@ -225,6 +225,10 @@ int			tcp_keepalives_idle;
 int			tcp_keepalives_interval;
 int			tcp_keepalives_count;
 
+#ifdef USE_SYSV_SEMAPHORES
+int			semas_per_set;
+#endif
+
 /*
  * These variables are all dummies that don't do anything, except in some
  * cases provide the value for SHOW to display.  The real state is elsewhere
@@ -1772,6 +1776,28 @@ static struct config_int ConfigureNamesInt[] =
 		},
 		&log_temp_files,
 		-1, -1, INT_MAX, NULL, NULL
+	},
+
+#ifdef USE_SYSV_SEMAPHORES
+	{
+		{"semas_per_set", PGC_POSTMASTER, RESOURCES_KERNEL,
+		 "Number of semaphores per SysV semaphore set (minus 1)",
+		 NULL,
+		 GUC_NOT_IN_SAMPLE
+		},
+		&semas_per_set,
+		16, 1, 32, NULL, NULL
+	},
+#endif
+
+	{
+		{"log2_num_lock_partitions", PGC_POSTMASTER, RESOURCES_MEM,
+		 "Log_2 of the number of lock partitions for the lock table",
+		 NULL,
+		 GUC_NOT_IN_SAMPLE
+		},
+		&log2_num_lock_partitions,
+		4, 1, LOG2_MAX_LOCK_PARTITIONS, NULL, NULL
 	},
 
 	/* End-of-list marker */

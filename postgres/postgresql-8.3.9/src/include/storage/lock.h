@@ -19,6 +19,7 @@
 #include "storage/itemptr.h"
 #include "storage/lwlock.h"
 #include "storage/shmem.h"
+#include "storage/gsl.h"
 
 
 /* struct PGPROC is declared in proc.h, but must forward-reference it */
@@ -32,6 +33,13 @@ typedef struct PROC_QUEUE
 
 /* GUC variables */
 extern int	max_locks_per_xact;
+extern int	log2_num_lock_partitions;
+
+#define LOG2_MAX_LOCK_PARTITIONS 10
+#define MAX_LOCK_PARTITIONS (1<<LOG2_MAX_LOCK_PARTITIONS)
+
+#define NUM_LOCK_PARTITIONS (1<<log2_num_lock_partitions)
+extern LWLockId	*LockMgrPartitionLocks;
 
 #ifdef LOCK_DEBUG
 extern int	Trace_lock_oidmin;
@@ -300,6 +308,12 @@ typedef struct LOCK
 	LOCKTAG		tag;			/* unique identifier of lockable object */
 
 	/* data */
+#ifdef LOCK_SCALABLE
+	gslLock_t   gsl;
+	volatile int pins;			/* pin count to prevent GC between
+								 * fetching from the hash table and
+								 * acquiring the lock */
+#else
 	LOCKMASK	grantMask;		/* bitmask for lock types already granted */
 	LOCKMASK	waitMask;		/* bitmask for lock types awaited */
 	SHM_QUEUE	procLocks;		/* list of PROCLOCK objects assoc. with lock */
@@ -308,11 +322,18 @@ typedef struct LOCK
 	int			nRequested;		/* total of requested[] array */
 	int			granted[MAX_LOCKMODES]; /* counts of granted locks */
 	int			nGranted;		/* total of granted[] array */
+#endif
 } LOCK;
 
 #define LOCK_LOCKMETHOD(lock) ((LOCKMETHODID) (lock).tag.locktag_lockmethodid)
 
 
+#ifdef LOCK_SCALABLE
+/*
+ * The PROCLOCK type shows up all over, so give a dummy definition.
+ */
+typedef struct PROCLOCK { } PROCLOCK;
+#else
 /*
  * We may have several different backends holding or awaiting locks
  * on the same lockable object.  We need to store some per-holder/waiter
@@ -368,6 +389,7 @@ typedef struct PROCLOCK
 
 #define PROCLOCK_LOCKMETHOD(proclock) \
 	LOCK_LOCKMETHOD(*((proclock).tag.myLock))
+#endif
 
 /*
  * Each backend also maintains a local hash table with information about each
@@ -403,7 +425,9 @@ typedef struct LOCALLOCK
 
 	/* data */
 	LOCK	   *lock;			/* associated LOCK object in shared mem */
+#ifndef LOCK_SCALABLE
 	PROCLOCK   *proclock;		/* associated PROCLOCK object in shmem */
+#endif
 	uint32		hashcode;		/* copy of LOCKTAG's hash value */
 	int64		nLocks;			/* total number of times lock is held */
 	int			numLockOwners;	/* # of relevant ResourceOwners */
@@ -460,7 +484,7 @@ typedef enum
 #define LockHashPartition(hashcode) \
 	((hashcode) % NUM_LOCK_PARTITIONS)
 #define LockHashPartitionLock(hashcode) \
-	((LWLockId) (FirstLockMgrLock + LockHashPartition(hashcode)))
+	(LockMgrPartitionLocks[LockHashPartition(hashcode)])
 
 
 /*
@@ -478,18 +502,39 @@ extern bool LockRelease(const LOCKTAG *locktag,
 extern void LockReleaseAll(LOCKMETHODID lockmethodid, bool allLocks);
 extern void LockReleaseCurrentOwner(void);
 extern void LockReassignCurrentOwner(void);
+#ifdef LOCK_SCALABLE
+extern void GSL_ACQUIRE_SLEEP(LWLockId *m, void *sleepArg);
+#endif
 extern VirtualTransactionId *GetLockConflicts(const LOCKTAG *locktag,
 				 LOCKMODE lockmode);
 extern void AtPrepare_Locks(void);
 extern void PostPrepare_Locks(TransactionId xid);
+#ifndef LOCK_SCALABLE
 extern int LockCheckConflicts(LockMethod lockMethodTable,
 				   LOCKMODE lockmode,
 				   LOCK *lock, PROCLOCK *proclock, PGPROC *proc);
 extern void GrantLock(LOCK *lock, PROCLOCK *proclock, LOCKMODE lockmode);
+#endif
 extern void GrantAwaitedLock(void);
+#ifndef LOCK_SCALABLE
 extern void RemoveFromWaitQueue(PGPROC *proc, uint32 hashcode);
+#endif
+extern void
+CleanUpLock(LOCK *lock,
+#ifndef LOCK_SCALABLE
+			PROCLOCK *proclock, LockMethod lockMethodTable,
+#endif
+			uint32 hashcode,
+#ifndef LOCK_SCALABLE
+			bool wakeupNeeded
+#else
+			bool lastLocalHold, bool lastHold
+#endif
+	);
 extern Size LockShmemSize(void);
+#ifndef LOCK_SCALABLE
 extern LockData *GetLockStatusData(void);
+#endif
 extern const char *GetLockmodeName(LOCKMETHODID lockmethodid, LOCKMODE mode);
 
 extern void lock_twophase_recover(TransactionId xid, uint16 info,
@@ -499,7 +544,9 @@ extern void lock_twophase_postcommit(TransactionId xid, uint16 info,
 extern void lock_twophase_postabort(TransactionId xid, uint16 info,
 						void *recdata, uint32 len);
 
+#ifndef LOCK_SCALABLE
 extern DeadLockState DeadLockCheck(PGPROC *proc);
+#endif
 extern PGPROC *GetBlockingAutoVacuumPgproc(void);
 extern void DeadLockReport(void);
 extern void RememberSimpleDeadLock(PGPROC *proc1,
@@ -511,6 +558,21 @@ extern void InitDeadLockChecking(void);
 #ifdef LOCK_DEBUG
 extern void DumpLocks(PGPROC *proc);
 extern void DumpAllLocks(void);
+#endif
+
+#ifdef LOCK_SCALABLE
+static inline void LockPin(LOCK *lock)
+{
+	__sync_add_and_fetch(&lock->pins, 1);
+}
+
+static inline int LockUnpin(LOCK *lock)
+{
+	int i;
+	i = __sync_add_and_fetch(&lock->pins, -1);
+	Assert(i >= 0);
+	return i;
+}
 #endif
 
 #endif   /* LOCK_H */

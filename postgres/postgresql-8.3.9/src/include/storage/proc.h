@@ -100,18 +100,27 @@ struct PGPROC
 
 	/* Info about lock the process is currently waiting for, if any. */
 	/* waitLock and waitProcLock are NULL if not currently waiting. */
+#ifdef LOCK_SCALABLE
+	gslPerProcShared_t gslPerProc; /* Per-process shared lock state */
+#endif
 	LOCK	   *waitLock;		/* Lock object we're sleeping on ... */
+#ifndef LOCK_SCALABLE
 	PROCLOCK   *waitProcLock;	/* Per-holder info for awaited lock */
+#endif
 	LOCKMODE	waitLockMode;	/* type of lock we're waiting for */
+#ifndef LOCK_SCALABLE
 	LOCKMASK	heldLocks;		/* bitmask for lock types already held on this
 								 * lock object by this backend */
+#endif
 
 	/*
 	 * All PROCLOCK objects for locks held or awaited by this backend are
 	 * linked into one of these lists, according to the partition number of
 	 * their lock.
 	 */
-	SHM_QUEUE	myProcLocks[NUM_LOCK_PARTITIONS];
+#ifndef LOCK_SCALABLE
+	SHM_QUEUE  *myProcLocks;
+#endif
 
 	struct XidCache subxids;	/* cache for subtransaction XIDs */
 };
@@ -163,9 +172,15 @@ extern bool HaveNFreeProcs(int n);
 extern void ProcReleaseLocks(bool isCommit);
 
 extern void ProcQueueInit(PROC_QUEUE *queue);
-extern int	ProcSleep(LOCALLOCK *locallock, LockMethod lockMethodTable);
+extern int	ProcSleep(LOCALLOCK *locallock, LockMethod lockMethodTable
+#ifdef LOCK_SCALABLE
+					  , LWLockId queueLock
+#endif
+	);
 extern PGPROC *ProcWakeup(PGPROC *proc, int waitStatus);
+#ifndef LOCK_SCALABLE
 extern void ProcLockWakeup(LockMethod lockMethodTable, LOCK *lock);
+#endif
 extern void LockWaitCancel(void);
 
 extern void ProcWaitForSignal(void);

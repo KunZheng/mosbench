@@ -12,9 +12,13 @@ subdir = src/backend/storage/lmgr
 top_builddir = ../../../..
 include $(top_builddir)/src/Makefile.global
 
-OBJS = lmgr.o lock.o proc.o deadlock.o lwlock.o spin.o s_lock.o
+OBJS = gsl.o lmgr.o lock.o proc.o deadlock.o lwlock.o spin.o s_lock.o
 
 all: SUBSYS.o
+
+# The GSL code depends heavily on GNU C99 features and also requires
+# 16-byte compare-swap support.
+gsl.o: CFLAGS += -std=gnu99 -Wno-declaration-after-statement -mcx16
 
 SUBSYS.o: $(OBJS)
 	$(LD) $(LDREL) $(LDOUT) SUBSYS.o $(OBJS)

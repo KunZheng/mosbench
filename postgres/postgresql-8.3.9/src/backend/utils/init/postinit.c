@@ -17,6 +17,9 @@
 
 #include <fcntl.h>
 #include <unistd.h>
+#ifdef PIN_PROCESSES
+#include <sched.h>
+#endif
 
 #include "access/heapam.h"
 #include "access/xact.h"
@@ -416,6 +419,24 @@ InitPostgres(const char *in_dbname, Oid dboid, const char *username,
 
 	if (MyBackendId > MaxBackends || MyBackendId <= 0)
 		elog(FATAL, "bad backend id: %d", MyBackendId);
+
+#ifdef PIN_PROCESSES
+	{
+		cpu_set_t cpuset;
+		int ret, i, cpu;
+		sched_getaffinity(getpid(), sizeof cpuset, &cpuset);
+		for (i = 0, cpu = 0; i < MyBackendId; ++i) {
+			do {
+				cpu = (cpu + 1) % CPU_SETSIZE;
+			} while (!CPU_ISSET(cpu, &cpuset));
+		}
+		CPU_ZERO(&cpuset);
+		CPU_SET(cpu, &cpuset);
+		if ((ret = sched_setaffinity(getpid(), sizeof cpuset, &cpuset)) < 0) {
+			elog(FATAL, "sched_setaffinity failed: %d", errno);
+		}
+	}
+#endif
 
 	/*
 	 * bufmgr needs another initialization call too

@@ -103,6 +103,11 @@ ProcGlobalShmemSize(void)
 	size = add_size(size, mul_size(NUM_AUXILIARY_PROCS, sizeof(PGPROC)));
 	/* MyProcs, including autovacuum */
 	size = add_size(size, mul_size(MaxBackends, sizeof(PGPROC)));
+#ifndef LOCK_SCALABLE
+	/* MyProcs->myProcLocks */
+	size = add_size(size, mul_size(NUM_LOCK_PARTITIONS * (MaxBackends + NUM_AUXILIARY_PROCS),
+								   sizeof(MyProc->myProcLocks[0])));
+#endif
 	/* ProcStructLock */
 	size = add_size(size, sizeof(slock_t));
 
@@ -188,6 +193,10 @@ InitProcGlobal(void)
 	{
 		PGSemaphoreCreate(&(procs[i].sem));
 		procs[i].links.next = ProcGlobal->freeProcs;
+#ifndef LOCK_SCALABLE
+		procs[i].myProcLocks =
+			ShmemAlloc(NUM_LOCK_PARTITIONS * sizeof procs[i].myProcLocks[0]);
+#endif
 		ProcGlobal->freeProcs = MAKE_OFFSET(&procs[i]);
 	}
 
@@ -201,6 +210,10 @@ InitProcGlobal(void)
 	{
 		PGSemaphoreCreate(&(procs[i].sem));
 		procs[i].links.next = ProcGlobal->autovacFreeProcs;
+#ifndef LOCK_SCALABLE
+		procs[i].myProcLocks =
+			ShmemAlloc(NUM_LOCK_PARTITIONS * sizeof procs[i].myProcLocks[0]);
+#endif
 		ProcGlobal->autovacFreeProcs = MAKE_OFFSET(&procs[i]);
 	}
 
@@ -208,6 +221,10 @@ InitProcGlobal(void)
 	for (i = 0; i < NUM_AUXILIARY_PROCS; i++)
 	{
 		AuxiliaryProcs[i].pid = 0;		/* marks auxiliary proc as not in use */
+#ifndef LOCK_SCALABLE
+		AuxiliaryProcs[i].myProcLocks =
+			ShmemAlloc(NUM_LOCK_PARTITIONS * sizeof AuxiliaryProcs[i].myProcLocks[0]);
+#endif
 		PGSemaphoreCreate(&(AuxiliaryProcs[i].sem));
 	}
 
@@ -225,7 +242,9 @@ InitProcess(void)
 	/* use volatile pointer to prevent code rearrangement */
 	volatile PROC_HDR *procglobal = ProcGlobal;
 	SHMEM_OFFSET myOffset;
+#ifndef LOCK_SCALABLE
 	int			i;
+#endif
 
 	/*
 	 * ProcGlobal should be set up already (if we are a backend, we inherit
@@ -298,9 +317,11 @@ InitProcess(void)
 	MyProc->lwExclusive = false;
 	MyProc->lwWaitLink = NULL;
 	MyProc->waitLock = NULL;
+#ifndef LOCK_SCALABLE
 	MyProc->waitProcLock = NULL;
 	for (i = 0; i < NUM_LOCK_PARTITIONS; i++)
 		SHMQueueInit(&(MyProc->myProcLocks[i]));
+#endif
 
 	/*
 	 * We might be reusing a semaphore that belonged to a failed process. So
@@ -371,7 +392,9 @@ InitAuxiliaryProcess(void)
 {
 	PGPROC	   *auxproc;
 	int			proctype;
+#ifndef LOCK_SCALABLE
 	int			i;
+#endif
 
 	/*
 	 * ProcGlobal should be set up already (if we are a backend, we inherit
@@ -436,9 +459,11 @@ InitAuxiliaryProcess(void)
 	MyProc->lwExclusive = false;
 	MyProc->lwWaitLink = NULL;
 	MyProc->waitLock = NULL;
+#ifndef LOCK_SCALABLE
 	MyProc->waitProcLock = NULL;
 	for (i = 0; i < NUM_LOCK_PARTITIONS; i++)
 		SHMQueueInit(&(MyProc->myProcLocks[i]));
+#endif
 
 	/*
 	 * We might be reusing a semaphore that belonged to a failed process. So
@@ -493,7 +518,11 @@ HaveNFreeProcs(int n)
 void
 LockWaitCancel(void)
 {
+#ifdef LOCK_SCALABLE
+	bool		lastLocalHold;
+#else
 	LWLockId	partitionLock;
+#endif
 
 	/* Nothing to do if we weren't waiting for a lock */
 	if (lockAwaited == NULL)
@@ -501,6 +530,23 @@ LockWaitCancel(void)
 
 	/* Turn off the deadlock timer, if it's still running (see ProcSleep) */
 	disable_sig_alarm(false);
+
+#ifdef LOCK_SCALABLE
+	LockPin(lockAwaited->lock);
+	if (gslCancel(&lockAwaited->lock->gsl, &lastLocalHold)) {
+		/* If we canceled the lock, we know we can't have been the
+		 * last holder (or, really, waiter), because otherwise it
+		 * would have been granted to us. */
+		CleanUpLock(lockAwaited->lock, lockAwaited->hashcode, lastLocalHold, false);
+	} else {
+		LockUnpin(lockAwaited->lock);
+		if (MyProc->waitStatus == STATUS_OK)
+			GrantAwaitedLock();
+	}
+	// XXX The old code doesn't clear waitLock in the grant case?
+	MyProc->waitLock = NULL;
+	lockAwaited = NULL;
+#else
 
 	/* Unlink myself from the wait queue, if on it (might not be anymore!) */
 	partitionLock = LockHashPartitionLock(lockAwaited->hashcode);
@@ -526,6 +572,7 @@ LockWaitCancel(void)
 	lockAwaited = NULL;
 
 	LWLockRelease(partitionLock);
+#endif
 
 	/*
 	 * We used to do PGSemaphoreReset() here to ensure that our proc's wait
@@ -715,22 +762,46 @@ ProcQueueInit(PROC_QUEUE *queue)
  * P() on the semaphore should put us to sleep.  The process
  * semaphore is normally zero, so when we try to acquire it, we sleep.
  */
+#ifdef LOCK_SCALABLE
+/*
+ * Interrupts must be disabled at entry, and will be disabled at exit,
+ * though they will be enabled in the middle, so the caller must be
+ * prepared for this to never return.
+ *
+ * The queueLock will always be released by this, whether it this
+ * returns normally or exits from a cancel/die interrupt.
+ *
+ * The pin count leaving this function will be the same as it was
+ * entering it.  If it gets interrupted, it will be one lower (that
+ * is, this takes care of releasing the pin in the event of a
+ * cancel/die interrupt).
+ */
+#endif
 int
-ProcSleep(LOCALLOCK *locallock, LockMethod lockMethodTable)
+ProcSleep(LOCALLOCK *locallock, LockMethod lockMethodTable
+#ifdef LOCK_SCALABLE
+		  , LWLockId queueLock
+#endif
+	)
 {
 	LOCKMODE	lockmode = locallock->tag.mode;
 	LOCK	   *lock = locallock->lock;
+#ifndef LOCK_SCALABLE
 	PROCLOCK   *proclock = locallock->proclock;
 	uint32		hashcode = locallock->hashcode;
 	LWLockId	partitionLock = LockHashPartitionLock(hashcode);
 	PROC_QUEUE *waitQueue = &(lock->waitProcs);
 	LOCKMASK	myHeldLocks = MyProc->heldLocks;
 	bool		early_deadlock = false;
+#endif
 	bool		allow_autovacuum_cancel = true;
 	int			myWaitStatus;
+#ifndef LOCK_SCALABLE
 	PGPROC	   *proc;
 	int			i;
+#endif
 
+#ifndef LOCK_SCALABLE
 	/*
 	 * Determine where to add myself in the wait queue.
 	 *
@@ -811,14 +882,18 @@ ProcSleep(LOCALLOCK *locallock, LockMethod lockMethodTable)
 	waitQueue->size++;
 
 	lock->waitMask |= LOCKBIT_ON(lockmode);
+#endif
 
 	/* Set up wait information in PGPROC object, too */
 	MyProc->waitLock = lock;
+#ifndef LOCK_SCALABLE
 	MyProc->waitProcLock = proclock;
+#endif
 	MyProc->waitLockMode = lockmode;
 
 	MyProc->waitStatus = STATUS_WAITING;
 
+#ifndef LOCK_SCALABLE
 	/*
 	 * If we detected deadlock, give up without waiting.  This must agree with
 	 * CheckDeadLock's recovery code, except that we shouldn't release the
@@ -829,10 +904,24 @@ ProcSleep(LOCALLOCK *locallock, LockMethod lockMethodTable)
 		RemoveFromWaitQueue(MyProc, hashcode);
 		return STATUS_ERROR;
 	}
+#endif
 
 	/* mark that we are waiting for a lock */
 	lockAwaited = locallock;
 
+#ifdef LOCK_SCALABLE
+	/*
+	 * Just before we begin accepting interrupts, release our pin.
+	 * We're a waiter now, we means the lock won't get GC'd.
+	 */
+	LockUnpin(lock);
+
+	/*
+	 * Release the wait queue lock and begin accepting interrupts.
+	 */
+	LWLockRelease(queueLock);
+	RESUME_INTERRUPTS();
+#else
 	/*
 	 * Release the lock table's partition lock.
 	 *
@@ -842,6 +931,7 @@ ProcSleep(LOCALLOCK *locallock, LockMethod lockMethodTable)
 	 * LockWaitCancel will clean up if cancel/die happens.
 	 */
 	LWLockRelease(partitionLock);
+#endif
 
 	/* Reset deadlock_state before enabling the signal handler */
 	deadlock_state = DS_NOT_YET_CHECKED;
@@ -1014,7 +1104,18 @@ ProcSleep(LOCALLOCK *locallock, LockMethod lockMethodTable)
 	 * off cancel/die interrupts before we can mess with lockAwaited (else we
 	 * might have a missed or duplicated locallock update).
 	 */
+#ifdef LOCK_SCALABLE
+	/* Rather than relying on the partition lock, we manage interrupts
+	 * manually */
+	HOLD_INTERRUPTS();
+	/* Bump the pin count back up so LockAcquire can bump it back
+	 * down.  Could be optimized, but this keeps the bookkeeping
+	 * simple.
+	 */
+	LockPin(lock);
+#else
 	LWLockAcquire(partitionLock, LW_EXCLUSIVE);
+#endif
 
 	/*
 	 * We no longer want LockWaitCancel to do anything.
@@ -1024,8 +1125,15 @@ ProcSleep(LOCALLOCK *locallock, LockMethod lockMethodTable)
 	/*
 	 * If we got the lock, be sure to remember it in the locallock table.
 	 */
+#ifdef LOCK_SCALABLE
+	/*
+	 * This is handled in LockAcquire for both the contended and
+	 * uncontended cases
+	 */
+#else
 	if (MyProc->waitStatus == STATUS_OK)
 		GrantAwaitedLock();
+#endif
 
 	/*
 	 * We don't have to do anything else, because the awaker did all the
@@ -1048,35 +1156,56 @@ ProcSleep(LOCALLOCK *locallock, LockMethod lockMethodTable)
  * to twiddle the lock's request counts too --- see RemoveFromWaitQueue.
  * Hence, in practice the waitStatus parameter must be STATUS_OK.
  */
+#ifdef LOCK_SCALABLE
+/*
+ * The wait queue mutex must be held by the caller.  This does not
+ * manage the wait queue.
+ *
+ * Always returns NULL.
+ */
+#endif
 PGPROC *
 ProcWakeup(PGPROC *proc, int waitStatus)
 {
+#ifndef LOCK_SCALABLE
 	PGPROC	   *retProc;
+#endif
 
 	/* Proc should be sleeping ... */
+#ifndef LOCK_SCALABLE
 	if (proc->links.prev == INVALID_OFFSET ||
 		proc->links.next == INVALID_OFFSET)
 		return NULL;
+#endif
 	Assert(proc->waitStatus == STATUS_WAITING);
 
+#ifndef LOCK_SCALABLE
 	/* Save next process before we zap the list link */
 	retProc = (PGPROC *) MAKE_PTR(proc->links.next);
 
 	/* Remove process from wait queue */
 	SHMQueueDelete(&(proc->links));
 	(proc->waitLock->waitProcs.size)--;
+#endif
 
 	/* Clean up process' state and pass it the ok/fail signal */
 	proc->waitLock = NULL;
+#ifndef LOCK_SCALABLE
 	proc->waitProcLock = NULL;
+#endif
 	proc->waitStatus = waitStatus;
 
 	/* And awaken it */
 	PGSemaphoreUnlock(&proc->sem);
 
+#ifdef LOCK_SCALABLE
+	return NULL;
+#else
 	return retProc;
+#endif
 }
 
+#ifndef LOCK_SCALABLE
 /*
  * ProcLockWakeup -- routine for waking up processes when a lock is
  *		released (or a prior waiter is aborted).  Scan all waiters
@@ -1136,7 +1265,13 @@ ProcLockWakeup(LockMethod lockMethodTable, LOCK *lock)
 
 	Assert(waitQueue->size >= 0);
 }
+#endif
 
+#ifdef LOCK_SCALABLE
+/*
+ * This is obviously unfortunate.
+ */
+#else
 /*
  * CheckDeadLock
  *
@@ -1166,7 +1301,7 @@ CheckDeadLock(void)
 	 * interrupts.
 	 */
 	for (i = 0; i < NUM_LOCK_PARTITIONS; i++)
-		LWLockAcquire(FirstLockMgrLock + i, LW_EXCLUSIVE);
+		LWLockAcquire(LockMgrPartitionLocks[i], LW_EXCLUSIVE);
 
 	/*
 	 * Check to see if we've been awoken by anyone in the interim.
@@ -1248,8 +1383,9 @@ CheckDeadLock(void)
 	 */
 check_done:
 	for (i = NUM_LOCK_PARTITIONS; --i >= 0;)
-		LWLockRelease(FirstLockMgrLock + i);
+		LWLockRelease(LockMgrPartitionLocks[i]);
 }
+#endif
 
 
 /*
@@ -1489,7 +1625,9 @@ handle_sig_alarm(SIGNAL_ARGS)
 	if (deadlock_timeout_active)
 	{
 		deadlock_timeout_active = false;
+#ifndef LOCK_SCALABLE
 		CheckDeadLock();
+#endif
 	}
 
 	if (statement_timeout_active)

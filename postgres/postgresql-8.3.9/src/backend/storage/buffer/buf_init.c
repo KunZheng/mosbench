@@ -82,6 +82,7 @@ InitBufferPool(void)
 {
 	bool		foundBufs,
 				foundDescs;
+	char		lockName[64];
 
 	BufferDescriptors = (BufferDesc *)
 		ShmemInitStruct("Buffer Descriptors",
@@ -125,8 +126,10 @@ InitBufferPool(void)
 			 */
 			buf->freeNext = i + 1;
 
-			buf->io_in_progress_lock = LWLockAssign();
-			buf->content_lock = LWLockAssign();
+			sprintf(lockName, "BufIOInProgress#%d/%d", i, NBuffers);
+			buf->io_in_progress_lock = LWLockAssign(lockName);
+			sprintf(lockName, "BufContent#%d/%d", i, NBuffers);
+			buf->content_lock = LWLockAssign(lockName);
 		}
 
 		/* Correct last entry of linked list */

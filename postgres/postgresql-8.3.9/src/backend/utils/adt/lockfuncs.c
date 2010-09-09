@@ -67,6 +67,9 @@ VXIDGetDatum(BackendId bid, LocalTransactionId lxid)
 Datum
 pg_lock_status(PG_FUNCTION_ARGS)
 {
+#ifdef LOCK_SCALABLE
+	elog(ERROR, "pg_lock_status not yet implemented with LOCK_SCALABLE");
+#else
 	FuncCallContext *funcctx;
 	PG_Lock_Status *mystatus;
 	LockData   *lockData;
@@ -308,6 +311,7 @@ pg_lock_status(PG_FUNCTION_ARGS)
 	}
 
 	SRF_RETURN_DONE(funcctx);
+#endif
 }
 
 
