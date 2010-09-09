@@ -1,0 +1,17 @@
+Both the original lock managers and our scalable lock managers are in
+the same source tree.  Unfortunately, this makes the code a tangled
+ifdef mess, but it has the advantage that you have a lot of control
+over which features you build.
+
+The source tree also includes a backport and extension of the advanced
+lock statistics patch from
+  http://osdir.com/ml/pgsql-hackers/2009-09/msg00801.html
+
+The core of the scalable heavyweight lock manager is implemented out
+of tree, in the gsl directory.  This code is designed to work both in
+Postgres and in the testing framework under gsl.  These are very
+different environments, so the gsl code depends on numerous stubs.
+For example, Postgres runs each thread in a separate address space so
+shared state must be explicit, while the tester runs in one address
+space so non-shared data must be explicit, so the gsl code makes both
+explicit and depends on the environment to do the right thing.
