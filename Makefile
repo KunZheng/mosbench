@@ -1,4 +1,4 @@
-all: all-exim all-gmake all-psearchy all-metis
+all: all-exim all-postgres all-gmake all-psearchy all-metis
 
 clean: clean-psearchy clean-metis
 
@@ -18,6 +18,14 @@ all-exim: all-libdb
 clean-exim:
 	$(MAKE) -C exim clean
 	$(MAKE) -C exim exim-clean
+
+.PHONY: all-postgres
+all-postgres:
+	$(MAKE) -C postgres all
+
+.PHONY: clean-postgres
+clean-postgres:
+	$(MAKE) -C postgres clean
 
 .PHONY: clean-gmake
 clean-gmake:
