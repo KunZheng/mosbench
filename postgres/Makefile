@@ -14,38 +14,43 @@ PG_CFLAGS += -DLWLOCK_STATS -DLWLOCK_TIMING_STATS -fno-omit-frame-pointer
 PG_DIR := $(shell cd postgresql-8.3.9; pwd)
 MY_DIR := $(shell pwd)
 
-all: pg-sysv pg-sysv-lwscale pg-sysv-lwscale-lockscale pg-posix pg-posix-lwscale pg-posix-lwscale-lockscale
-clean: clean-sysv clean-sysv-lwscale clean-sysv-lwscale-lockscale clean-posix clean-posix-lwscale clean-posix-lwscale-lockscale
+VARIANTS := sysv sysv-lwscale sysv-lwscale-lockscale posix posix-lwscale posix-lwscale-lockscale
+
+all: $(addprefix pg-,$(VARIANTS))
+
+clean: $(addprefix clean-,$(VARIANTS))
 	rm -rf build
+	$(MAKE) -C pgload clean
 
 .PHONY: always
+
 pg-%: always
-	@$(MAKE) --no-print-directory vars-$*- TARGET=$@
+	@$(MAKE) --no-print-directory setup-$*- TARGET=$@
+	$(MAKE) -C $(MY_DIR)/build/pg-$*
+	$(MAKE) -C $(MY_DIR)/build/pg-$* install
 
 clean-%: always
 	rm -rf pg-$*
 
-vars-:
+setup-:
 	if [ ! -e $(MY_DIR)/build/$(TARGET)/GNUmakefile ]; then \
 		mkdir -p $(MY_DIR)/build/$(TARGET) && \
 		cd $(MY_DIR)/build/$(TARGET) && \
 		$(PG_DIR)/configure --prefix=$(MY_DIR)/$(TARGET) $(PG_CONFIG) CFLAGS="$(PG_CFLAGS)" LDFLAGS="$(PG_LDFLAGS)"; \
 	fi
-	$(MAKE) -C $(MY_DIR)/build/$(TARGET)
-	$(MAKE) -C $(MY_DIR)/build/$(TARGET) install
 
-vars-sysv-: vars-
+setup-sysv-: setup-
 	@true
 
-vars-posix-: PG_LDFLAGS += -pthread
-vars-posix-: PG_CONFIG += USE_UNNAMED_POSIX_SEMAPHORES=1
-vars-posix-: vars-
+setup-posix-: PG_LDFLAGS += -pthread
+setup-posix-: PG_CONFIG += USE_UNNAMED_POSIX_SEMAPHORES=1
+setup-posix-: setup-
 	@true
 
-vars-%-lwscale-: PG_CFLAGS += -DLWLOCK_SCALABLE=1
-vars-%-lwscale-: vars-%-
+setup-%-lwscale-: PG_CFLAGS += -DLWLOCK_SCALABLE=1
+setup-%-lwscale-: setup-%-
 	@true
 
-vars-%-lockscale-: PG_CFLAGS += -DLOCK_SCALABLE=1
-vars-%-lockscale-: vars-%-
+setup-%-lockscale-: PG_CFLAGS += -DLOCK_SCALABLE=1
+setup-%-lockscale-: setup-%-
 	@true
