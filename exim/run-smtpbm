@@ -24,8 +24,7 @@ def startLoad(count, port):
     for i in range(count):
         # smtpbm will exit if its parent dies, which makes our
         # exception handling much simpler (and often absent
-        # altogether).  We pass our PID just in case we die before it
-        # sets up the parent death signal.
+        # altogether).
         procs.append(
             subprocess.Popen(["./smtpbm", "127.0.0.1", str(port),
                               "%d@mosbench.org" % i, "mosbench@mosbench.org"],
