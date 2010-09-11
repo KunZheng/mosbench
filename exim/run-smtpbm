@@ -27,8 +27,7 @@ def startLoad(count, port):
         # altogether).  We pass our PID just in case we die before it
         # sets up the parent death signal.
         procs.append(
-            subprocess.Popen(["./smtpbm", "-p", str(os.getpid()),
-                              "127.0.0.1", str(port),
+            subprocess.Popen(["./smtpbm", "127.0.0.1", str(port),
                               "%d@mosbench.org" % i, "mosbench@mosbench.org"],
                              stdout = subprocess.PIPE))
         # Don't hit the system too hard
