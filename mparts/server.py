@@ -81,7 +81,7 @@ class Process(object):
     def getCode(self):
         return self.__p.returncode
 
-    def kill(self, sig):
+    def kill(self, sig = signal.SIGINT):
         os.kill(self.__p.pid, sig)
 
     def wait(self, check=True):
