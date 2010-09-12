@@ -102,7 +102,7 @@ class Manager(object):
                     raise ValueError("Task %s is running in another manager" %
                                      obj.name)
                 continue
-            if hasattr(obj, "start"):
+            if hasattr(obj, "start") and obj.start:
                 with Progress("Starting %s" % obj.name):
                     self.__callMeMethod(obj.start)
             obj._state = RUNNING
@@ -112,7 +112,7 @@ class Manager(object):
         """Wait on waitable started tasks in this manager."""
 
         for obj in self.__tasks:
-            if obj._state == RUNNING and hasattr(obj, "wait"):
+            if obj._state == RUNNING and hasattr(obj, "wait") and obj.wait:
                 assert obj._manager == self
                 with Progress("Waiting on %s" % obj.name):
                     self.__callMeMethod(obj.wait)
@@ -125,7 +125,7 @@ class Manager(object):
             if obj._state == STOPPED:
                 continue
             assert obj._manager == self
-            if hasattr(obj, "stop"):
+            if hasattr(obj, "stop") and obj.stop:
                 with Progress("Stopping %s" % obj.name):
                     self.__callMeMethod(obj.stop)
             obj._state = STOPPED
@@ -139,7 +139,7 @@ class Manager(object):
 
         for obj in reversed(self.__tasks):
             assert obj._manager == None or obj._manager == self
-            if hasattr(obj, "reset"):
+            if hasattr(obj, "reset") and obj.reset:
                 with Progress("Resetting %s" % obj.name):
                     try:
                         self.__callMeMethod(obj.reset)

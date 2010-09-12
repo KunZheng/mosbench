@@ -272,10 +272,13 @@ class ExplicitSystemMonitor(SystemMonitor):
     def __init__(self, *args, **kwargs):
         SystemMonitor.__init__(self, *args, **kwargs)
         self.__p = None
+        self.__gen = 0
 
     def start(self):
+        assert self.__p == None
         cmd = self.wrap([], start = "start", end = "end")
-        self.__logPath = self.host.getLogPath(self)
+        self.__logPath = self.host.getLogPath(self) + ".%d" % self.__gen
+        self.__gen += 1
         self.__p = self.host.r.run(cmd, stdin = CAPTURE,
                                    stdout = self.__logPath,
                                    wait = False)
@@ -299,7 +302,10 @@ class ExplicitSystemMonitor(SystemMonitor):
         self.__p.stdinWrite("end\n")
         # Force results out
         self.__term(True)
+        # Get the results
         log = self.host.r.readFile(self.__logPath)
+        # Start a new monitor, for multiple trials
+        self.start()
         return self.parseLog(log)
 
 __all__.append("perfLocked")

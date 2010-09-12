@@ -13,10 +13,12 @@ __all__ = []
 __all__.append("PGLoad")
 class PGLoad(Task, ResultsProvider, SourceFileProvider,
              postgres.PGOptsProvider):
-    __config__ = ["host", "clients", "rows", "partitions", "*sysmonOut"]
+    __config__ = ["host", "trial", "clients", "rows", "partitions",
+                  "*sysmonOut"]
 
-    def __init__(self, host, pg, cores, clients, rows, partitions, sysmon):
-        Task.__init__(self, host = host)
+    def __init__(self, host, trial, pg, cores, clients, rows, partitions,
+                 sysmon):
+        Task.__init__(self, host = host, trial = trial)
         ResultsProvider.__init__(self, cores)
         # XXX Use this elsewhere
         self.setConfigAttrs(PGLoad, locals())
@@ -26,6 +28,10 @@ class PGLoad(Task, ResultsProvider, SourceFileProvider,
 
         self.__pgload = self.queueSrcFile(host, "pgload")
         self.queueSrcFile(host, "libload")
+
+        if trial != 0:
+            # Only start one PGLoad object per data point
+            self.start = None
 
     def getPGOpts(self, pg):
         return {"listen_addresses": "*"}
@@ -138,8 +144,9 @@ class PostgresRunner(object):
         m += pg
         sysmon = ExplicitSystemMonitor(host)
         m += sysmon
-        # XXX Options, trials
-        m += PGLoad(loadgen, pg, cfg.cores, 48, 10000000, 0, sysmon)
+        for trial in range(cfg.trials):
+            # XXX Options
+            m += PGLoad(loadgen, trial, pg, cfg.cores, 48, 10000000, 0, sysmon)
         m.run()
 
 __all__.append("runner")
