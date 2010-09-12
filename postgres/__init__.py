@@ -59,7 +59,11 @@ class PGLoad(Task, ResultsProvider, SourceFileProvider,
                            "--partitions=%d" % self.partitions),
                 stdout = STDERR)
 
-        # XXX Prefetch
+        # Prefetch
+        for t in tables:
+            self.pg.psql("select * from " + t, dbname = self.__dbname,
+                         discard = True)
+            self.pg.psql("vacuum " + t, dbname = self.__dbname, discard = True)
 
     def wait(self):
         cmd = self.__cmd("bench")
@@ -69,6 +73,9 @@ class PGLoad(Task, ResultsProvider, SourceFileProvider,
         # Run
         logPath = self.host.getLogPath(self)
         l = self.host.r.run(cmd, stdout = logPath, wait = False)
+
+        # XXX If something goes wrong, we won't notice for a very long
+        # time.
 
         # Wait for warmup duration (XXX)
         time.sleep(3)
@@ -87,6 +94,7 @@ class PGLoad(Task, ResultsProvider, SourceFileProvider,
         # Cleanup pgload
         time.sleep(1)
         l.kill(signal.SIGINT)
+        l.wait()
 
         # Get result
         log = self.host.r.readFile(logPath)
