@@ -3,6 +3,7 @@
 #include "libload.h"
 
 #include <errno.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +13,10 @@
 #include <sys/prctl.h>
 #include <sys/time.h>
 #include <sys/wait.h>
+
+static int numWorkers;
+static int64_t *initialCounts;
+static int64_t prevTotal;
 
 static double
 floatTime(void)
@@ -32,9 +37,52 @@ onSigint(int signum)
                 requestShutdown();
 }
 
+static void
+resetCounts(int x)
+{
+        if (x != 0)
+                printf("[SIG] Resetting counts\n");
+        for (int i = 0; i < numWorkers; ++i)
+                initialCounts[i] = sharedMem->counts[i];
+        prevTotal = 0;
+}
+
+static void
+printCount(int x)
+{
+        // Read counts
+        int64_t newCounts[numWorkers];
+        for (int i = 0; i < numWorkers; ++i)
+                newCounts[i] = sharedMem->counts[i];
+
+        // Diff against initial counts
+        int64_t total = 0;
+        for (int i = 0; i < numWorkers; ++i) {
+                total += newCounts[i] - initialCounts[i];
+        }
+
+        if (x != 0)
+                printf("[SIG] ");
+        if (printf("%"PRIi64" total queries, %"PRIi64" delta\n", total,
+                   total - prevTotal) <= 0
+            || fflush(stdout) != 0) {
+                // Nobody's listening any more.  Shut down.
+                requestShutdown();
+        }
+
+        prevTotal = total;
+}
+
 void
 createWorkerProcs(int num, void (*worker)(void))
 {
+        // Set up global state
+        numWorkers = num;
+        initialCounts = malloc(num * sizeof *initialCounts);
+        if (!initialCounts)
+                panic("failed to allocate counts");
+
+
         // Create the shared memory segment
         int shmemsize = sizeof *sharedMem + num * sizeof sharedMem->counts[0];
         sharedMem = mmap(NULL, shmemsize,
@@ -46,6 +94,9 @@ createWorkerProcs(int num, void (*worker)(void))
 
         // Set up a signal handler to shut down cleanly on SIGINT
         signal(SIGINT, onSigint);
+
+        // Flush stdout so our children don't inherit any buffered data
+        fflush(stdout);
 
         // Create and run workers
         int pids[num];
@@ -81,53 +132,37 @@ createWorkerProcs(int num, void (*worker)(void))
         fprintf(stderr, "\n");
 
         // Get initial counts
-        int64_t counts[num];
-        for (int i = 0; i < num; ++i)
-                counts[i] = sharedMem->counts[i];
+        resetCounts(0);
 
-        int total = 0;
+        // Install signal handlers.  We have to do this after we get
+        // the initial counts so we don't race.  Also, by doing this
+        // after the workers are sync'd, if we get a signal before
+        // we're ready, we'll exit.
+        signal(SIGUSR1, resetCounts);
+        signal(SIGUSR2, printCount);
+
         int samples = 0;
         double start = floatTime();
         while (1) {
                 // Do our best to sample once per second
+                double target = start + samples + 1;
                 double now = floatTime();
-                useconds_t usec = (start - now + samples + 1) * 1000000;
-                if (usec <= 1000000)
-                        usleep(usec);
+                if (target < now)
+                        fprintf(stderr, "Not keeping up (%g sec behind)\n", target - now);
                 else
-                        fprintf(stderr, "Not keeping up (usec %d)\n", usec);
+                        usleep((target - now) * 1000000);
 
                 if (shutdownQueued())
                         break;
 
-                // Read counts
-                int64_t newCounts[num];
-                for (int i = 0; i < num; ++i)
-                        newCounts[i] = sharedMem->counts[i];
-
-                // Diff against previous counts
-                int sampleTotal = 0;
-                for (int i = 0; i < num; ++i) {
-                        sampleTotal += newCounts[i] - counts[i];
-                }
-                memcpy(counts, newCounts, sizeof counts);
-
-                // Generate sample statistics
-                total += sampleTotal;
-                samples++;
-
-                if (printf("%f %d (avg %d)\n", floatTime(), sampleTotal,
-                           total/(samples*num)) <= 0
-                    || fflush(stdout) != 0) {
-                        // Nobody's listening any more.  Shut down.
-                        break;
-                }
+                printCount(0);
+                ++samples;
         }
 
         // Wait for workers
         requestShutdown();
         for (int i = 0; i <= num; ++i) {
-                fprintf(stderr, "\rWaiting for workers... %d/%d", i, num);
+                fprintf(stderr, "\rWaiting for worker shutdown... %d/%d", i, num);
                 if (i < num)
                         while (wait(NULL) < 0 && errno == EINTR);
         }
