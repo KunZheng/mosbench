@@ -65,23 +65,23 @@ class TimeMonitor(object):
         return " ".join(out)
 
 args = sys.argv[1:]
-
 start = end = proc = None
+while args and args[0].startswith("-"):
+    arg = args.pop(0)
+    if arg == "-s" and args:
+        start = args.pop(0)
+    elif arg == "-e" and args:
+        end = args.pop(0)
+    else:
+        usage()
+triggers = [start, end]
+
 if len(args) == 0:
     f = sys.stdin
 else:
-    while args[0].startswith("-"):
-        arg = args.pop(0)
-        if arg == "-s" and args:
-            start = args.pop(0)
-        elif arg == "-e" and args:
-            end = args.pop(0)
-        else:
-            usage()
     # XXX Use a PTY to avoid flushing issues?
     proc = subprocess.Popen(args, stdout = subprocess.PIPE)
     f = proc.stdout
-triggers = [start, end]
 
 m = TimeMonitor()
 if start == None:
