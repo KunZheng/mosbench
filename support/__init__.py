@@ -1,4 +1,4 @@
-import sys, os, signal, time, errno
+import sys, os, time, errno
 
 from mparts.manager import Task
 from mparts.host import *
@@ -266,6 +266,41 @@ class SystemMonitor(Task, SourceFileProvider):
             k, v = parts.pop(0), parts.pop(0)
             res["time." + k] = float(v)
         return res
+
+__all__.append("ExplicitSystemMonitor")
+class ExplicitSystemMonitor(SystemMonitor):
+    def __init__(self, *args, **kwargs):
+        SystemMonitor.__init__(self, *args, **kwargs)
+        self.__p = None
+
+    def start(self):
+        cmd = self.wrap([], start = "start", end = "end")
+        self.__logPath = self.host.getLogPath(self)
+        self.__p = self.host.r.run(cmd, stdin = CAPTURE,
+                                   stdout = self.__logPath,
+                                   wait = False)
+
+    def __term(self, check):
+        if self.__p:
+            self.__p.stdinClose()
+            self.__p.wait(check)
+            self.__p = None
+
+    def stop(self):
+        self.__term(True)
+
+    def reset(self):
+        self.__term(False)
+
+    def startMonitor(self):
+        self.__p.stdinWrite("start\n")
+
+    def stopMonitor(self):
+        self.__p.stdinWrite("end\n")
+        # Force results out
+        self.__term(True)
+        log = self.host.r.readFile(self.__logPath)
+        return self.parseLog(log)
 
 __all__.append("perfLocked")
 def perfLocked(host, cmdSsh, cmdSudo, cmdRun):

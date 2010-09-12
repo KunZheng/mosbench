@@ -1,21 +1,24 @@
 from mparts.manager import Task
 from mparts.host import HostInfo, SourceFileProvider, STDERR
-from support import ResultsProvider, SetCPUs, FileSystem, SystemMonitor
+from support import ResultsProvider, SetCPUs, FileSystem, ExplicitSystemMonitor
 import postgres
 
-import os
+import os, time, signal, re
 
 __all__ = []
 
 __all__.append("PGLoad")
-class PGLoad(Task, SourceFileProvider, postgres.PGOptsProvider):
-    __config__ = ["host", "clients", "rows", "partitions"]
+class PGLoad(Task, ResultsProvider, SourceFileProvider,
+             postgres.PGOptsProvider):
+    __config__ = ["host", "clients", "rows", "partitions", "*sysmonOut"]
 
-    def __init__(self, host, pg, clients, rows, partitions):
+    def __init__(self, host, pg, cores, clients, rows, partitions, sysmon):
         Task.__init__(self, host = host)
+        ResultsProvider.__init__(self, cores)
         # XXX Use this elsewhere
         self.setConfigAttrs(PGLoad, locals())
         self.pg = pg
+        self.sysmon = sysmon
         self.__dbname = "pg%d-%d" % (self.rows, self.partitions)
 
         self.__pgload = self.queueSrcFile(host, "pgload")
@@ -65,7 +68,34 @@ class PGLoad(Task, SourceFileProvider, postgres.PGOptsProvider):
 
         # Run
         logPath = self.host.getLogPath(self)
-        self.host.r.run(cmd, stdout = logPath)
+        l = self.host.r.run(cmd, stdout = logPath, wait = False)
+
+        # Wait for warmup duration (XXX)
+        time.sleep(3)
+
+        # Start monitoring
+        l.kill(signal.SIGUSR1)
+        self.sysmon.startMonitor()
+
+        # Wait for run duration (XXX)
+        time.sleep(10)
+
+        # Stop monitoring
+        l.kill(signal.SIGUSR2)
+        self.sysmonOut = self.sysmon.stopMonitor()
+
+        # Cleanup pgload
+        time.sleep(1)
+        l.kill(signal.SIGINT)
+
+        # Get result
+        log = self.host.r.readFile(logPath)
+        ms = re.findall("(?m)^\[SIG\] ([0-9]+) total queries", log)
+        if len(ms) != 1:
+            raise RuntimeError("Expected 1 query count in log, got %d",
+                               len(ms))
+        self.setResults(int(ms[-1]), "query", "queries",
+                        self.sysmonOut["time.real"])
 
 # XXX Use this naming convention elsewhere.  Put the nice name in the
 # ResultsProvider for the graphs.
@@ -91,8 +121,10 @@ class PostgresRunner(object):
         pg = postgres.Postgres(host, pgPath, "pg-sysv", dbdir)
         m += postgres.InitDB(host, pg).addTrust(loadgen)
         m += pg
-        # XXX Options
-        m += PGLoad(loadgen, pg, 48, 10000000, 0)
+        sysmon = ExplicitSystemMonitor(host)
+        m += sysmon
+        # XXX Options, trials
+        m += PGLoad(loadgen, pg, cfg.cores, 48, 10000000, 0, sysmon)
         m.run()
 
 __all__.append("runner")
