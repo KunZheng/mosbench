@@ -44,7 +44,7 @@ class InitDB(Task):
         self.host.r.run(["mkdir", "-p", dbdir])
 
         # Initialize the database
-        self.host.r.run([self.pg.bin("initdb"), dbdir])
+        self.pg.initdb(dbdir)
 
         # Set up trust
         for t in self.trust:
@@ -97,6 +97,9 @@ class Postgres(Task):
 
     def __bin(self, name):
         return os.path.join(self.pgPath, self.pgBuild, "bin", name)
+
+    def initdb(self, dbdir):
+        self.host.r.run([self.__bin("initdb"), dbdir], addEnv = self.__addEnv)
 
     def psql(self, sql, dbname = None, discard = False, args = ["-A", "-t"]):
         p = self.host.r.run([self.__bin("psql")] +
