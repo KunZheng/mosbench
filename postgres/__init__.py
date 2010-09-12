@@ -124,12 +124,13 @@ class PostgresRunner(object):
 
         m += host
         m += loadgen
-        # XXX Creating the db takes time.  It would be great if we
-        # didn't wipe it out between data points.  Maybe just set
-        # clean to False and put the DB in a subdirectory.
-        fs = FileSystem(host, cfg.fs, clean = False) #, clean = True)
+        m += HostInfo(host)
+        # Creating the db takes time, so we don't clean the file
+        # system.  We avoid any cruft that may be there already by
+        # putting the DB in a subdirectory.
+        fs = FileSystem(host, cfg.fs, clean = False)
         m += fs
-        dbdir = fs.path + "0"
+        dbdir = fs.path + "0/postgres"
         pgPath = os.path.join(cfg.benchRoot, "postgres")
         # XXX Postgres build
         pg = postgres.Postgres(host, pgPath, "pg-sysv", dbdir)
