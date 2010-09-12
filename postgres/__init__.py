@@ -10,6 +10,9 @@ import os, time, signal, re
 
 __all__ = []
 
+WARMUP = 3
+DURATION = 15
+
 __all__.append("PGLoad")
 class PGLoad(Task, ResultsProvider, SourceFileProvider,
              postgres.PGOptsProvider):
@@ -85,8 +88,8 @@ class PGLoad(Task, ResultsProvider, SourceFileProvider,
         logPath = self.host.getLogPath(self)
         l = self.host.r.run(cmd, stdout = logPath, wait = False)
 
-        # Wait for warmup duration (XXX config)
-        time.sleep(3)
+        # Wait for warmup duration
+        time.sleep(WARMUP)
 
         # Start monitoring
         l.kill(signal.SIGUSR1)
@@ -96,8 +99,8 @@ class PGLoad(Task, ResultsProvider, SourceFileProvider,
         # the end of the run
         l.wait(poll = True)
 
-        # Wait for run duration (XXX config)
-        time.sleep(10)
+        # Wait for run duration
+        time.sleep(DURATION)
 
         # Stop monitoring
         l.kill(signal.SIGUSR2)
@@ -116,6 +119,19 @@ class PGLoad(Task, ResultsProvider, SourceFileProvider,
                                len(ms))
         self.setResults(int(ms[-1]), "query", "queries",
                         self.sysmonOut["time.real"])
+
+def getBuild(cfg):
+    if cfg.sleep not in ["sysv", "posix"]:
+        raise ValueError(
+            "Postgres sleep mode must be sysv or posix, got %r" % cfg.sleep)
+    build = "pg-%s" % cfg.sleep
+    if cfg.lwScale:
+        build += "-lwscale"
+    if cfg.lockScale:
+        if not cfg.lwScale:
+            raise ValueError("lockscale requires lwscale")
+        build += "-lockscale"
+    return build
 
 # XXX Use this naming convention elsewhere.  Put the nice name in the
 # ResultsProvider for the graphs.
@@ -138,15 +154,15 @@ class PostgresRunner(object):
         m += fs
         dbdir = fs.path + "0/postgres"
         pgPath = os.path.join(cfg.benchRoot, "postgres")
-        # XXX Postgres build
-        pg = postgres.Postgres(host, pgPath, "pg-sysv", dbdir)
+        pgBuild = getBuild(cfg)
+        pg = postgres.Postgres(host, pgPath, pgBuild, dbdir)
         m += postgres.InitDB(host, pg).addTrust(loadgen)
         m += pg
         sysmon = ExplicitSystemMonitor(host)
         m += sysmon
         for trial in range(cfg.trials):
-            # XXX Options
-            m += PGLoad(loadgen, trial, pg, cfg.cores, 48, 10000000, 0, sysmon)
+            m += PGLoad(loadgen, trial, pg, cfg.cores, cfg.cores,
+                        cfg.rows, cfg.partitions, sysmon)
         m.run()
 
 __all__.append("runner")

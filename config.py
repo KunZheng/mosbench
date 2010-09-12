@@ -4,7 +4,9 @@ from support import perfLocked
 
 # For an explanation of configuration spaces and a description of why
 # we use '*' and '+' all over this file, see the module documentation
-# for mparts.configspace.
+# for mparts.configspace.  In short, * combines configuration options,
+# while + specifies alternate configurations.  Likewise, passing a
+# list to mk creates a set of alternate configurations.
 
 mk = ConfigSpace.mk
 
@@ -113,6 +115,36 @@ exim *= mk(eximPort = 2526)
 exim *= mk(eximClients = 64)
 
 ##################################################################
+# Postgres
+#
+# sleep - The method Postgres uses to sleep when a lock is taken.  Can
+# be "sysv" for SysV semaphores or "posix" for POSIX semaphores (that
+# is, futexes on Linux).
+#
+# lwScale - Whether or not to use scalable lightweight locks
+# (read/write mutexes).
+#
+# lockScale - Whether or not to use scalable database locks.  Scalable
+# database locks depend on scalable lightweight locks.
+#
+# rows - The number of rows in the database.
+#
+# partitions - The number of tables to split the database across.
+
+import postgres
+
+postgres = mk(benchmark = postgres.runner, nonConst = True)
+
+# XXX
+postgres *= mk(secondaryHost = josmp)
+
+postgres *= mk(sleep = "sysv")
+postgres *= mk(lwScale = True)
+postgres *= mk(lockScale = True)
+postgres *= mk(rows = 10000000)
+postgres *= mk(partitions = 0)
+
+##################################################################
 # gmake
 #
 
@@ -123,6 +155,16 @@ gmake = mk(benchmark = gmake.runner, nonConst = True)
 ##################################################################
 # psearchy
 #
+# mode - The mode to run mkdb in.  Must be "thread" or "process".
+#
+# seq - The sequence to assign cores in.  Must be "seq" for sequential
+# assignment or "rr" for round-robin assignment.
+#
+# mem - How much memory to allocate to the hash table, in megabytes.
+# XXX Per core or total?
+#
+# dblim - The maximum number of entries to store per Berkeley DB file.
+# None for no limit.
 
 import psearchy
 
@@ -159,10 +201,11 @@ metis *= mk(order = ["rr"])
 # one configuration.  Furthermore, instead of computing the regular
 # product, we compute a "merge" product, where assignments from the
 # left will override assignments to the same variables from the right.
-#configSpace = (exim + gmake + psearchy + metis).merge(shared)
+#configSpace = (exim + postgres + gmake + psearchy + metis).merge(shared)
 #configSpace = exim.merge(shared)
+configSpace = postgres.merge(shared)
 #configSpace = gmake.merge(shared)
-configSpace = psearchy.merge(shared)
+#configSpace = psearchy.merge(shared)
 #configSpace = metis.merge(shared)
 
 ##################################################################
