@@ -151,7 +151,7 @@ class Postgres(Task):
         providers = {}
         for p in m.find(cls = PGOptsProvider):
             for k, v in p.getPGOpts(self).iteritems():
-                if k in providers and config[k] != v:
+                if k in providers and opts[k] != v:
                     raise ValueError("%s and %s differ on Postgres setting %s" %
                                      (providers[k], p, k))
                 opts[k] = v
