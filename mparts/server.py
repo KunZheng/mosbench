@@ -84,11 +84,11 @@ class Process(object):
     def kill(self, sig = signal.SIGINT):
         os.kill(self.__p.pid, sig)
 
-    def wait(self, check=True):
+    def wait(self, check=True, poll=False):
         """Wait for this process to exit, returning its exit code (or
         -N if it died by signal N).  Unlike UNIX wait, this wait is
         idempotent.  If check is True, raise a ValueError if the
-        return code is non-zero."""
+        return code is non-zero.  If poll is True, don't block."""
 
         # We serialize through a lock because the underlying wait call
         # will only return successfully to one concurrent wait and we
@@ -99,6 +99,8 @@ class Process(object):
         with self.__waitLock:
             if self.__p.returncode != None:
                 code = self.__p.returncode
+            elif poll:
+                code = self.__p.poll()
             else:
                 code = self.__p.wait()
                 if self.__p.stdin:

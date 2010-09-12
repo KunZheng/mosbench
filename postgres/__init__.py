@@ -1,5 +1,8 @@
+from __future__ import with_statement
+
 from mparts.manager import Task
 from mparts.host import HostInfo, SourceFileProvider, STDERR
+from mparts.util import Progress
 from support import ResultsProvider, SetCPUs, FileSystem, ExplicitSystemMonitor
 import postgres
 
@@ -60,10 +63,12 @@ class PGLoad(Task, ResultsProvider, SourceFileProvider,
                 stdout = STDERR)
 
         # Prefetch
-        for t in tables:
-            self.pg.psql("select * from " + t, dbname = self.__dbname,
-                         discard = True)
-            self.pg.psql("vacuum " + t, dbname = self.__dbname, discard = True)
+        with Progress("Prefetching tables"):
+            for t in tables:
+                self.pg.psql("select * from " + t, dbname = self.__dbname,
+                             discard = True)
+                self.pg.psql("vacuum " + t, dbname = self.__dbname,
+                             discard = True)
 
     def wait(self):
         cmd = self.__cmd("bench")
@@ -74,17 +79,18 @@ class PGLoad(Task, ResultsProvider, SourceFileProvider,
         logPath = self.host.getLogPath(self)
         l = self.host.r.run(cmd, stdout = logPath, wait = False)
 
-        # XXX If something goes wrong, we won't notice for a very long
-        # time.
-
-        # Wait for warmup duration (XXX)
+        # Wait for warmup duration (XXX config)
         time.sleep(3)
 
         # Start monitoring
         l.kill(signal.SIGUSR1)
         self.sysmon.startMonitor()
 
-        # Wait for run duration (XXX)
+        # Check that pgload hasn't died on us, rather than find out at
+        # the end of the run
+        l.wait(poll = True)
+
+        # Wait for run duration (XXX config)
         time.sleep(10)
 
         # Stop monitoring
