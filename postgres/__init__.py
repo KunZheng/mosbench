@@ -3,24 +3,25 @@ from __future__ import with_statement
 from mparts.manager import Task
 from mparts.host import HostInfo, SourceFileProvider, STDERR
 from mparts.util import Progress
-from support import ResultsProvider, SetCPUs, FileSystem, ExplicitSystemMonitor
+from support import ResultsProvider, SetCPUs, IXGBE, FileSystem, \
+    ExplicitSystemMonitor
 import postgres
 
-import os, time, signal, re
+import os, time, signal, re, math
 
 __all__ = []
 
-WARMUP = 3
+WARMUP = 5
 DURATION = 15
 
 __all__.append("PGLoad")
 class PGLoad(Task, ResultsProvider, SourceFileProvider,
              postgres.PGOptsProvider):
     __config__ = ["host", "trial", "clients", "rows", "partitions",
-                  "*sysmonOut"]
+                  "batchSize", "randomWritePct", "*sysmonOut"]
 
     def __init__(self, host, trial, pg, cores, clients, rows, partitions,
-                 sysmon):
+                 batchSize, randomWritePct, sysmon):
         Task.__init__(self, host = host, trial = trial)
         ResultsProvider.__init__(self, cores)
         # XXX Use this elsewhere
@@ -81,8 +82,9 @@ class PGLoad(Task, ResultsProvider, SourceFileProvider,
 
     def wait(self):
         cmd = self.__cmd("bench")
-        for arg in ["rows", "partitions", "clients"]:
-            cmd.extend(["--" + arg, str(getattr(self, arg))])
+        for arg in ["rows", "partitions", "clients", "batchSize",
+                    "randomWritePct"]:
+            cmd.extend(["--" + arg.lower(), str(getattr(self, arg))])
 
         # Run
         logPath = self.host.getLogPath(self)
@@ -152,17 +154,41 @@ class PostgresRunner(object):
         # putting the DB in a subdirectory.
         fs = FileSystem(host, cfg.fs, clean = False)
         m += fs
+
         dbdir = fs.path + "0/postgres"
         pgPath = os.path.join(cfg.benchRoot, "postgres")
         pgBuild = getBuild(cfg)
-        pg = postgres.Postgres(host, pgPath, pgBuild, dbdir)
+        pgOpts = {"shared_buffers": postgres.PGVal(cfg.bufferCache, "MB")}
+        log2NumLockPartitions = int(math.log(cfg.lockPartitions, 2))
+        if cfg.lockPartitions != 1 << log2NumLockPartitions:
+            raise ValueError("numLockPartitions must be a power of 2, got %r" %
+                             cfg.numLockPartitions)
+        pgOpts["log2_num_lock_partitions"] = log2NumLockPartitions
+        if cfg.sleep == "sysv":
+            pgOpts["semas_per_set"] = cfg.semasPerSet
+        pg = postgres.Postgres(host, pgPath, pgBuild, dbdir,
+                               malloc = cfg.malloc, **pgOpts)
         m += postgres.InitDB(host, pg).addTrust(loadgen)
         m += pg
+
+        if cfg.hotplug:
+            # Because the number of cores and the number of clients is
+            # the same, we don't strictly need hotplug
+            m += SetCPUs(host = host, num = cfg.cores)
+        # XXX Make configurable
+#        m += IXGBE(host, "eth0", queues = "n*NCPU/(NRX if rx else NTX)")
+        # The ixgbe driver assigns flows to queues sequentially.
+        # Since we only have cfg.cores flows, make sure a sequential
+        # assignment spans all the online cores.  However, this does
+        # not spread things out if we have more queues than cores.
+        m += IXGBE(host, "eth0", queues = "n%min(NCPU, NRX if rx else NTX)")
+
         sysmon = ExplicitSystemMonitor(host)
         m += sysmon
         for trial in range(cfg.trials):
             m += PGLoad(loadgen, trial, pg, cfg.cores, cfg.cores,
-                        cfg.rows, cfg.partitions, sysmon)
+                        cfg.rows, cfg.partitions, cfg.batchSize,
+                        cfg.randomWritePct, sysmon)
         m.run()
 
 __all__.append("runner")

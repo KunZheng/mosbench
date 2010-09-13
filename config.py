@@ -117,19 +117,40 @@ exim *= mk(eximClients = 64)
 ##################################################################
 # Postgres
 #
+# rows - The number of rows in the database.
+#
+# partitions - The number of tables to split the database across.
+#
+# batchSize - The number of queries each client should send to
+# Postgres at a time.  This causes the load generator to act like a
+# connection pooler with query aggregation.
+#
+# randomWritePct - The percentage of queries that should be updates.
+#
 # sleep - The method Postgres uses to sleep when a lock is taken.  Can
 # be "sysv" for SysV semaphores or "posix" for POSIX semaphores (that
 # is, futexes on Linux).
 #
+# semasPerSet - For sysv sleep, the number of semaphores per SysV
+# semaphore set.  In the kernel, each semaphore set is protected by
+# one lock.  Ignored for posix sleep.
+#
 # lwScale - Whether or not to use scalable lightweight locks
-# (read/write mutexes).
+# (read/write mutexes) in Postgres.
 #
-# lockScale - Whether or not to use scalable database locks.  Scalable
-# database locks depend on scalable lightweight locks.
+# lockScale - Whether or not to use scalable database locks in
+# Postgres.  Enabling scalable database locks requires scalable
+# lightweight locks.
 #
-# rows - The number of rows in the database.
+# lockPartitions - The number of partitions for the database lock
+# manager.  Each partition is protected by an underlying lightweight
+# lock.  This must be a power of 2.  The Postgres default is 1<<4.
 #
-# partitions - The number of tables to split the database across.
+# malloc - The malloc implementation to use in Postgres.  Must be
+# tcmalloc or glibc.  For tcmalloc, you'll need to install the
+# tcmalloc library.
+#
+# bufferCache - The size of the Postgres buffer cache, in megabytes.
 
 import postgres
 
@@ -138,11 +159,21 @@ postgres = mk(benchmark = postgres.runner, nonConst = True)
 # XXX
 postgres *= mk(secondaryHost = josmp)
 
-postgres *= mk(sleep = "sysv")
-postgres *= mk(lwScale = True)
-postgres *= mk(lockScale = True)
 postgres *= mk(rows = 10000000)
 postgres *= mk(partitions = 0)
+postgres *= mk(batchSize = 256)
+postgres *= mk(randomWritePct = [0, 5])
+
+pgopt = (mk(sleep = "sysv") * mk(semasPerSet = 16) *
+         mk(lwScale = True) * mk(lockScale = True) *
+         mk(lockPartitions = 1<<10))
+pgstock = (mk(sleep = "sysv") * mk(semasPerSet = 16) *
+           mk(lwScale = False) * mk(lockScale = False) *
+           mk(lockPartitions = 1<<4))
+
+postgres *= pgopt + pgstock
+postgres *= mk(malloc = "tcmalloc")
+postgres *= mk(bufferCache = 2048)
 
 ##################################################################
 # gmake
@@ -201,7 +232,7 @@ metis *= mk(order = ["rr"])
 # one configuration.  Furthermore, instead of computing the regular
 # product, we compute a "merge" product, where assignments from the
 # left will override assignments to the same variables from the right.
-#configSpace = (exim + postgres + gmake + psearchy + metis).merge(shared)
+#configSpace = (exim + gmake + psearchy + metis).merge(shared)
 #configSpace = exim.merge(shared)
 configSpace = postgres.merge(shared)
 #configSpace = gmake.merge(shared)
