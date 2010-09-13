@@ -10,6 +10,7 @@ SCALE = {"MakeKernel" : (("hour", 60*60), ("secs", 1)),
          "Smtpbm" : (("sec", 1), ("microsecs", 1000*1000)),
          "Mkdb" : (("hour", 60*60), ("secs", 1)),
          "Wrmem" : (("hour", 60*60), ("secs", 1)),
+         "PGLoad" : (("sec", 1), ("microsecs", 1000*1000)),
          }
 
 def usage():
