@@ -563,11 +563,11 @@ void *dofiles(void *arg)
   strcpy(oldoutfile, outfile);
   strcpy(outfile+strlen(outfile),".tmp");
 
-  ps.maxinfo = (NBYTES/sizeof(PostIt))/ncore; 
-  ps.maxword = (NBYTES)/ncore;
+  ps.maxinfo = NBYTES/sizeof(PostIt);
+  ps.maxword = NBYTES;
   ps.wordbytes = (char *)malloc(ps.maxword);
   ps.infobuf = (PostIt *)malloc(sizeof(PostIt)*ps.maxinfo);
-  ps.maxhash = ((NBYTES)/sizeof(struct Bucket))/ncore;
+  ps.maxhash = NBYTES/sizeof(struct Bucket);
   
 //   for (int j = 0; j < 31; j++) {
 //     if (hash_primes[j] >= ps.maxhash) {
@@ -584,7 +584,7 @@ void *dofiles(void *arg)
   ps.wordi = 0;
   ps.infoi = 0;
 
-  ps.maxblocks = ((NBYTES)/sizeof(struct Block))/ncore; 
+  ps.maxblocks = NBYTES/sizeof(struct Block);
   ps.blocks = (struct Block *) malloc(ps.maxblocks * sizeof(struct Block));
   ps.blocki = 0;
   

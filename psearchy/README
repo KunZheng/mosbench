@@ -8,7 +8,7 @@ Create directories to store the per-core dbs and files.  You may want to mount s
    mkdir /tmp/db/db1
    ....
 
-To build the indices using two cores (-c 2) and a fixed amount of memory (-m 1024), run
+To build the indices using two cores (-c 2) with a 1024 MB hash table per core (-m 1024), run:
 
    ./mkdb/pedsort -t /tmp/db/db -c 2 -m 1024 < files
 

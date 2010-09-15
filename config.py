@@ -191,8 +191,8 @@ gmake = mk(benchmark = gmake.runner, nonConst = True)
 # seq - The sequence to assign cores in.  Must be "seq" for sequential
 # assignment or "rr" for round-robin assignment.
 #
-# mem - How much memory to allocate to the hash table, in megabytes.
-# XXX Per core or total?
+# mem - How much memory to allocate to the hash table on each core, in
+# megabytes.
 #
 # dblim - The maximum number of entries to store per Berkeley DB file.
 # None for no limit.
@@ -203,7 +203,7 @@ psearchy = mk(benchmark = psearchy.runner, nonConst = True)
 
 psearchy *= (mk(mode = ["thread"]) * mk(order = ["seq"]) +
              mk(mode = ["process"]) * mk(order = ["seq", "rr"]))
-psearchy *= mk(mem = 1024)
+psearchy *= mk(mem = 48)
 psearchy *= mk(dblim = 200000)
 
 ##################################################################
