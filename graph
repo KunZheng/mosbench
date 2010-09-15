@@ -109,7 +109,7 @@ for name, exps in series(*paths):
 
     g, idx = graphs.get(fixed.className, (None, 0))
     if not g:
-        g = graph.Gnuplot(pdf = "graph-%s.pdf" % fixed.className)
+        g = graph.Gnuplot() #(pdf = "graph-%s.pdf" % fixed.className)
         g.title = fixed.className
         g.xlabel = "cores"
         g.ylabel = fixed.units.replace("/sec/", "/%s/" % scaleRes[0])
