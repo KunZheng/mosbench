@@ -51,11 +51,13 @@ class Mkdb(Task, ResultsProvider):
             cmd.extend(["-s", "1"])
         if self.dblim:
             cmd.extend(["-l", str(self.dblim)])
-        # XXX For the submission, we measured the entire time,
-        # including file list loading.  That may be a more natural
-        # definition of "job" even though the file list loading is
-        # sequential.
-        cmd = self.sysmon.wrap(cmd, "Building index")
+        # For the submission, we measured the entire time, including
+        # file list loading.  This is probably a more natural
+        # definition of "job", even though that part is sequential.
+        cmd = self.sysmon.wrap(cmd)
+        # We could instead only start measuring once we start
+        # indexing.
+        #cmd = self.sysmon.wrap(cmd, "Building index")
 
         # Run
         logPath = self.host.getLogPath(self)
