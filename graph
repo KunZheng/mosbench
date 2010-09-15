@@ -5,6 +5,7 @@ import mparts.table as table
 import mparts.graph as graph
 
 import sys, os
+import optparse
 
 SCALE = {"MakeKernel" : (("hour", 60*60), ("secs", 1)),
          "Smtpbm" : (("sec", 1), ("microsecs", 1000*1000)),
@@ -13,15 +14,34 @@ SCALE = {"MakeKernel" : (("hour", 60*60), ("secs", 1)),
          "PGLoad" : (("sec", 1), ("microsecs", 1000*1000)),
          }
 
-def usage():
-    print >> sys.stderr, """\
-Usage: %s dirs...
+def parseArgs(args):
+    usage = """\
+Usage: %prog [options] dirs...
 
 Recursively find all benchmark data point directories under the
 directories given as arguments and graph those data points.  Separate
-benchmark types will be plotted in separate graphs.
-""" % sys.argv[0]
-    sys.exit(2)
+benchmark types will be plotted in separate graphs."""
+
+    parser = optparse.OptionParser(usage = usage)
+    parser.add_option("-p", "--strip", dest = "strip", type = "int",
+                      default = 0, help = "strip NUM path elements from key",
+                      metavar = "NUM")
+    for time in ["user", "sys", "idle"]:
+        parser.add_option("--no-" + time, action = "store_false",
+                          dest = time, default = True,
+                          help = "don't display %s time" % time)
+    def noTimes(option, opt, value, parser):
+        parser.values.user = parser.values.sys = parser.values.idle = False
+    parser.add_option("--no-times", action = "callback",
+                      callback = noTimes,
+                      help = "don't display any times")
+    parser.add_option("--y2-max", dest = "y2Max", type = "float",
+                      default = None, help = "set upper limit of y2 to MAX",
+                      metavar = "MAX")
+
+    if not len(args):
+        parser.error("Arguments expected")
+    return parser.parse_args(args)
 
 def resultsTable(exps):
     out = []
@@ -64,11 +84,12 @@ def resultsTable(exps):
     desc = table.TableDesc(*cols)
     return table.Table.fromIterable(out, desc)
 
-if len(sys.argv) == 1:
-    usage()
+opts, paths = parseArgs(sys.argv[1:])
 
 graphs = {}
-for name, exps in series(*sys.argv[1:]):
+for name, exps in series(*paths):
+    name = "/".join(name.split("/")[opts.strip:])
+
     tab = resultsTable(exps)
     fixed = the(tab.project("className", "units"))
 
@@ -88,19 +109,16 @@ for name, exps in series(*sys.argv[1:]):
 
     g, idx = graphs.get(fixed.className, (None, 0))
     if not g:
-        g = graph.Gnuplot()
+        g = graph.Gnuplot(pdf = "graph-%s.pdf" % fixed.className)
         g.title = fixed.className
         g.xlabel = "cores"
         g.ylabel = fixed.units.replace("/sec/", "/%s/" % scaleRes[0])
         g.yrange = "[0:*]"
-        if "user" in tab.desc:
-            # XXX Fudge, have to divide by amount of work.  Perhaps I
-            # want to record the absolute result (which will be 1 for
-            # the job-oriented benchmarks) and use the measured real
-            # time and core count to compute throughput here.  Then
-            # use that to compute CPU time per work unit.
+        if "user" in tab.desc and (opts.user or opts.sys or opts.idle):
             g.y2label = "CPU time (%s/%s)" % (scaleTime[0], tunits)
             g.y2tics = ""
+            if opts.y2Max != None:
+                g.y2range = "[0:%g]" % opts.y2Max
             g.ytics = "nomirror"
 
     projRes = lambda row: row.result * scaleRes[1]
@@ -110,6 +128,8 @@ for name, exps in series(*sys.argv[1:]):
         for n, t in [(6, "user"),  # Circle for wx terminal
                      (8, "sys"),   # Triangle
                      (2, "idle")]: # Cross
+            if not getattr(opts, t):
+                continue
             projTime = lambda row: getattr(row, t) * scaleTime[1]
             g.addData(tab.project("cores", (t, projTime)), axis = "x1y2",
                       with_ = "linespoints", title = name + " " + t,

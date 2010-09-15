@@ -21,13 +21,17 @@ def mkGenSetter(prop):
 class Gnuplot(object):
     __slots__ = ["__g", "__cmds", "__plot", "__dataFile", "__dataIndex"]
 
-    def __init__(self):
+    def __init__(self, pdf = None):
         self.__g = subprocess.Popen(["gnuplot", "--persist"],
                                     stdin = subprocess.PIPE)
         self.__cmds = []
         self.__plot = []
         self.__dataFile = None
         self.__dataIndex = 0
+
+        if pdf != None:
+            self("set terminal pdfcairo")
+            self("set output \"%s\"" % pdf)
 
     def __call__(self, cmd):
         self.__cmds.append(cmd)
@@ -46,6 +50,7 @@ class Gnuplot(object):
     yrange = mkGenSetter("yrange")
     y2label = mkStrSetter("y2label")
     y2tics = mkGenSetter("y2tics")
+    y2range = mkGenSetter("y2range")
     title = mkStrSetter("title")
 
     def addData(self, data, axis = None, title = None, with_ = None,
