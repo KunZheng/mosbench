@@ -1,49 +1,44 @@
-all: all-exim all-gmake all-psearchy all-metis
+TARGETS=exim postgres gmake psearchy metis
 
-clean: clean-psearchy clean-metis
+all: $(addprefix all-,$(TARGETS))
+clean: $(addprefix clean-,$(TARGETS))
 
-.PHONY: all-libdb
-all-libdb:
+.PHONY: always
+
+all-libdb: always
 	$(MAKE) -C libdb all
 
-.PHONY: clean-libdb
-clean-libdb:
+clean-libdb: always
 	$(MAKE) -C libdb clean
 
-.PHONY: all-exim
-all-exim: all-libdb
+all-exim: all-libdb always
 	$(MAKE) -C exim all
 
-.PHONY: clean-exim
-clean-exim:
+clean-exim: always
 	$(MAKE) -C exim clean
 	$(MAKE) -C exim exim-clean
 
-.PHONY: all-exim
-all-exim:
-	$(MAKE) -C exim all
+all-postgres: always
+	$(MAKE) -C postgres all
 
-.PHONY: clean-gmake
-clean-gmake:
+clean-postgres: always
+	$(MAKE) -C postgres clean
 
-.PHONY: all-gmake
-all-gmake:
+clean-gmake: always
 
-.PHONY: all-psearchy
-all-psearchy:
+all-gmake: always
+
+all-psearchy: always
 	$(MAKE) -C psearchy/mkdb all
 
-.PHONY: clean-psearchy
-clean-psearchy:
+clean-psearchy: always
 	$(MAKE) -C psearchy/mkdb clean
 
-.PHONY: all-metis
-all-metis:
+all-metis: always
 	$(MAKE) -C metis O=obj.default SF_MODEL=default obj.default/app/wrmem obj.default/app/wrmem.sf
 	$(MAKE) -C metis O=obj.hugetlb SF_MODEL=hugetlb HUGETLB_MOUNT=/tmp/mosbench/hugetlb obj.hugetlb/app/wrmem obj.hugetlb/app/wrmem.sf
 
-.PHONY: clean-metis
-clean-metis:
+clean-metis: always
 	$(MAKE) -C metis O=obj.default clean
 	$(MAKE) -C metis O=obj.hugetlb clean
 

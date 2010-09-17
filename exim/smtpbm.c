@@ -151,18 +151,14 @@ int main(int argc, char ** argv)
 {
 	struct sockaddr_in sin;
 
+	if(argc != 5)
+		usage();
+
 	if(prctl(PR_SET_PDEATHSIG, SIGINT, 0, 0, 0) == -1)
 		oops("prctl");
 
-	if(argc > 2 && strcmp(argv[1], "-p") == 0) {
-		if (getppid() != atoi(argv[2]))
-			oops("parent exited early");
-		argc -= 2;
-		argv += 2;
-	}
-
-	if(argc != 5)
-		usage();
+	if(getppid() == 1)
+		oops("parent exited early");
 
 	signal(SIGUSR1, reset);
 	signal(SIGUSR2, printTotal);
@@ -176,6 +172,6 @@ int main(int argc, char ** argv)
 		usage();
 
 	reset(0);
-	while (1)
+	while(1)
 		do1(&sin, argv[3], argv[4]);
 }

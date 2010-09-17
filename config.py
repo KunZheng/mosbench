@@ -109,6 +109,7 @@ exim = mk(benchmark = exim.runner, nonConst = True)
 
 exim *= mk(eximBuild = "exim-mod")
 exim *= mk(eximPort = 2526)
+# XXX Rename this "clients"
 exim *= mk(eximClients = 64)
 
 ##################################################################
@@ -130,6 +131,7 @@ psearchy = mk(benchmark = psearchy.runner, nonConst = True)
 psearchy *= (mk(mode = ["thread"]) * mk(order = ["seq"]) +
              mk(mode = ["process"]) * mk(order = ["seq", "rr"]))
 psearchy *= mk(mem = 1024)
+psearchy *= mk(dblim = 200000)
 
 ##################################################################
 # Metis
@@ -141,6 +143,7 @@ metis = mk(benchmark = metis.runner, nonConst = True)
 
 metis *= mk(streamflow = True)
 metis *= mk(model = ["default", "hugetlb"])
+metis *= mk(order = ["rr"])
 
 ##################################################################
 # Complete configuration
@@ -157,9 +160,9 @@ metis *= mk(model = ["default", "hugetlb"])
 # product, we compute a "merge" product, where assignments from the
 # left will override assignments to the same variables from the right.
 #configSpace = (exim + gmake + psearchy + metis).merge(shared)
-configSpace = exim.merge(shared)
+#configSpace = exim.merge(shared)
 #configSpace = gmake.merge(shared)
-#configSpace = psearchy.merge(shared)
+configSpace = psearchy.merge(shared)
 #configSpace = metis.merge(shared)
 
 ##################################################################

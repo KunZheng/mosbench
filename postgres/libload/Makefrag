@@ -1,0 +1,11 @@
+DIR := $(TOPDIR)/libload
+
+SRCS := $(DIR)/msg.c $(DIR)/args.c $(DIR)/procs.c
+
+$(DIR)/libload.o: $(SRCS) $(DIR)/libload.h
+	gcc -std=c99 -g -c -combine -o $@ $(SRCS)
+
+clean: clean-libload
+
+clean-libload:
+	rm -rf $(DIR)/libload.o

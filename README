@@ -104,6 +104,9 @@ command.  When a benchmark completes successfully, these logs are
 copied to the driver host, but if it fails, they're left in tmp on the
 remote host.
 
+Try unmounting the MOSBENCH file systems (sudo ./mkmounts -u <type>)
+and remounting them.
+
 
 == Benchmark infrastructure ==
 

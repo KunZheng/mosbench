@@ -11,7 +11,8 @@ class Wrmem(Task, ResultsProvider):
     __config__ = ["host", "trial", "metisPath", "streamflow", "model",
                   "*sysmonOut"]
 
-    def __init__(self, host, trial, cores, metisPath, streamflow, model, sysmon):
+    def __init__(self, host, trial, cores, metisPath, streamflow, model,
+                 setcpus, sysmon):
         assert model in ["default", "hugetlb"], \
             "Unknown Metis memory model %r" % model
 
@@ -22,15 +23,19 @@ class Wrmem(Task, ResultsProvider):
         self.metisPath = metisPath
         self.streamflow = streamflow
         self.model = model
+        self.setcpus = setcpus
         self.sysmon = sysmon
 
     def wait(self, m):
+        cpuseq = ",".join(map(str, self.setcpus.getSeq()))
+
         obj = os.path.join(self.metisPath, "obj." + self.model)
         cmd = [os.path.join(obj, "app",
                             "wrmem" + (".sf" if self.streamflow else "")),
                "-p", str(self.cores)]
         cmd = self.sysmon.wrap(cmd, "Starting mapreduce", "Finished mapreduce")
-        addEnv = {"LD_LIBRARY_PATH" : os.path.join(obj, "lib")}
+        addEnv = {"LD_LIBRARY_PATH" : os.path.join(obj, "lib"),
+                  "CPUSEQ" : cpuseq}
 
         # Run
         logPath = self.host.getLogPath(self)
@@ -55,13 +60,14 @@ class Metis(object):
             fs = FileSystem(host, "hugetlb", clean = True)
             m += fs
         metisPath = os.path.join(cfg.benchRoot, "metis")
-        if cfg.hotplug:
-            m += SetCPUs(host = host, num = cfg.cores)
+        setcpus = SetCPUs(host = host, num = cfg.cores, hotplug = cfg.hotplug,
+                          seq = cfg.order)
+        m += setcpus
         sysmon = SystemMonitor(host)
         m += sysmon
         for trial in range(cfg.trials):
             m += Wrmem(host, trial, cfg.cores, metisPath, cfg.streamflow,
-                       cfg.model, sysmon)
+                       cfg.model, setcpus, sysmon)
         # m += cfg.monitors
         m.run()
 

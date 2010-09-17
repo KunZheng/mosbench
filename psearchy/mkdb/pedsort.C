@@ -47,6 +47,7 @@ DID max_did = 1;
 int first = 1;
 int order = 0;
 int threaded = 1;
+int dblim = 0;
 
 extern int nprimes, primes[];
 
@@ -94,7 +95,7 @@ bool update_only;
 void *dofiles(void *arg);
 void cleanup(int cid, int exit_status, int pass0files);
 int pass0(int cid, FILE *input, DID did, int *pass0files,  struct pass0_state *ps);
-void passN(int cid, DB *db, char *outfile, char *oldoutfile, int pass0files);
+void passN(int cid, char *outfile, char *oldoutfile, int pass0files);
 float printrusage(int init);
 void flushwords(int cid, struct pass0_state *ps, int *pass0files);
 
@@ -332,7 +333,7 @@ main(int argc, char *argv[])
 
   update_only = false;
 
-  while ((ch = getopt(argc, argv, "t:f:u:c:m:s:p")) != -1) {
+  while ((ch = getopt(argc, argv, "t:f:u:c:m:s:pl:")) != -1) {
     switch (ch) {
       case 't':
         tmpdir = optarg;
@@ -356,6 +357,9 @@ main(int argc, char *argv[])
       case 'p':
         threaded = 0;
         break;
+      case 'l':
+        dblim = atoi(optarg);
+        break;
       default:
         break;
     }
@@ -364,7 +368,7 @@ main(int argc, char *argv[])
   argv += optind;
 
   if (argc != 0) {
-    fprintf(stderr,"./pedsort [-t tmpdir] [-u (update)] [-f config_file] [-c ncore] [-s sched] [-p]\n");
+    fprintf(stderr,"./pedsort [-t tmpdir] [-u (update)] [-f config_file] [-c ncore] [-s sched] [-p] [-l dblim]\n");
     exit(1);
   }
 
@@ -492,11 +496,55 @@ main(int argc, char *argv[])
   exit(0);
 }
 
+struct w2p_db
+{
+  int cid;                      // Core id
+  int sid;                      // Shard id
+  DB *db;
+  int count;
+};
+
+void w2p_open(struct w2p_db *w2p)
+{
+  char dbfile[MAXFILENAME];
+  DB *db;
+
+  assert(!w2p->db);
+
+  printf("Core %d shard %d\n", w2p->cid, w2p->sid);
+
+  sprintf(dbfile, "%s%d/%s-w2p.db-%d.%d", tmpdir, w2p->cid, prefix.c_str(), w2p->cid, w2p->sid);
+  int err = db_create(&db, NULL, 0);
+  if (err) {
+    fprintf(stderr,"failed to create db %s\n", strerror(errno));
+    exit(2);
+  }
+  err = db->open(db, NULL, dbfile, NULL, DB_BTREE, DB_TRUNCATE|DB_CREATE, 0666);
+  if (err) {
+    fprintf(stderr,"failed to open db %s %s\n", dbfile, strerror(errno));
+    exit(2);
+  }
+
+  w2p->db = db;
+  w2p->count = 0;
+}
+
+void w2p_close(struct w2p_db *w2p)
+{
+  assert(w2p->db);
+
+  if(w2p->db->close(w2p->db, 0) != 0){
+    fprintf(stderr, "pedsort: db %d close failed %s\n", w2p->cid, strerror(errno));
+    exit(1);
+  }
+
+  w2p->db = NULL;
+  w2p->sid++;
+}
+
 void *dofiles(void *arg)
 {
   int cid = (long long) arg;
-  DB *db;
-  char dbfile[MAXFILENAME];
   char outfile[MAXFILENAME];
   char oldoutfile[MAXFILENAME];
   int pass0files = 0;
@@ -510,18 +558,6 @@ void *dofiles(void *arg)
   set_affinity(c);
   // printf("%d assigned to core %d\n", cid, c);
 #endif
-
-  sprintf(dbfile, "%s%d/%s-w2p.db-%d", tmpdir, cid, prefix.c_str(), cid);
-  int err = db_create(&db, NULL, 0);
-  if (err) {
-    fprintf(stderr,"failed to create db %s\n", strerror(errno));
-    exit(2);
-  }
-  err = db->open(db, NULL, dbfile, NULL, DB_BTREE, DB_TRUNCATE|DB_CREATE, 0666);
-  if (err) {
-    fprintf(stderr,"failed to open db %s %s\n", dbfile, strerror(errno));
-    exit(2);
-  }
 
   sprintf(outfile, "%s%d/%s-f-%d", tmpdir, cid, prefix.c_str(), cid);
   strcpy(oldoutfile, outfile);
@@ -589,12 +625,7 @@ void *dofiles(void *arg)
   delete ps.blocks;
   delete ps.table;
 
-  passN(cid, db, outfile, oldoutfile, pass0files);
-
-  if(db->close(db, 0) != 0){
-    fprintf(stderr, "pedsort: db %d close failed %s\n", cid, strerror(errno));
-    exit(1);
-  }
+  passN(cid, outfile, oldoutfile, pass0files);
 
 #ifdef COUNTER
   read_counters(cid);
@@ -878,8 +909,9 @@ zcopy(int cid, FILE *ifp, FILE *ofp, unsigned n, int pass0files)
 }
 
 void
-passN(int cid, DB *db, char *outfile, char *oldoutfile, int pass0files)
+passN(int cid, char *outfile, char *oldoutfile, int pass0files)
 {
+  struct w2p_db w2p = {cid};
   int opass = 0;
   int onf = pass0files;
   int nnf = 0;
@@ -999,6 +1031,12 @@ passN(int cid, DB *db, char *outfile, char *oldoutfile, int pass0files)
         if (done) {
           numwords++;
 
+          if (dblim && ++w2p.count > dblim)
+            w2p_close(&w2p);
+
+          if (!w2p.db)
+            w2p_open(&w2p);
+
           DBT key, data;
           bzero(&key,sizeof(key));
           bzero(&data,sizeof(data));
@@ -1007,11 +1045,11 @@ passN(int cid, DB *db, char *outfile, char *oldoutfile, int pass0files)
           key.size = strlen(minword) + 1;
           data.data = &offset;
           data.size = sizeof(ind_offset);
-          if((err = db->put(db, NULL, &key, &data, DB_NOOVERWRITE)) != 0){
+          if((err = w2p.db->put(w2p.db, NULL, &key, &data, DB_NOOVERWRITE)) != 0){
             // fprintf(stderr, "mkdb: db->put failed %s\n", db_strerror(err));
           }
           offset += strlen(minword) + 1 + sizeof(nsum) + nsum * sizeof(PostIt);
-
+          w2p.count++;
         }
 
         /*
@@ -1049,6 +1087,10 @@ passN(int cid, DB *db, char *outfile, char *oldoutfile, int pass0files)
         // fprintf(stderr, "pedsort: merged %d files, %u words, ", onf, numwords);
         //fprintf(stderr, "\n");
         rename(outfile, oldoutfile);
+
+        if (w2p.db)
+          w2p_close(&w2p);
+
         return;
       }
     }

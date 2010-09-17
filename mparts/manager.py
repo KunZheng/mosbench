@@ -264,6 +264,16 @@ class Task(object):
     def log(self, msg):
         print "[%s] %s" % (self.name, msg)
 
+    def setConfigAttrs(self, cls, dct):
+        """For any variable in both cls.__config__ and dct, set that
+        attribute in this object to the value in dct.  Passing in
+        'locals()' for dct is a quick way to set lots of configurable
+        attributes in a class' constructor."""
+
+        for v in cls.__config__:
+            if v in dct:
+                setattr(self, v, dct[v])
+
 class ResultPath(Task):
     """A ResultPath tracks where to store the results of an
     experiment."""
@@ -321,7 +331,6 @@ def generateManagers(resultRoot, configSpace):
             print "Time so far: %s\tETA: %s" % \
                 (time.strftime("%H:%M:%S", time.gmtime(now - start)),
                  time.strftime("%H:%M:%S", time.gmtime((now - start)*(len(configSpace) - n)/n)))
-        prNotice(1, "*** Starting configuration %d/%d ***" % (n+1, len(configSpace)))
 
         # Construct result path
         path = basepath
@@ -329,6 +338,8 @@ def generateManagers(resultRoot, configSpace):
             if cfgConst:
                 continue
             path = os.path.join(path, "%s-%s" % (cfgName, cfgVal))
+        prNotice(1, "*** Starting configuration %d/%d (%s) ***" % \
+                     (n+1, len(configSpace), path[len(basepath):].lstrip("/")))
 
         m = Manager()
         m += ResultPath(path, noTS = True)

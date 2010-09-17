@@ -6,6 +6,12 @@ import mparts.graph as graph
 
 import sys, os
 
+SCALE = {"MakeKernel" : (("hour", 60*60), ("secs", 1)),
+         "Smtpbm" : (("sec", 1), ("microsecs", 1000*1000)),
+         "Mkdb" : (("hour", 60*60), ("secs", 1)),
+         "Wrmem" : (("hour", 60*60), ("secs", 1)),
+         }
+
 def usage():
     print >> sys.stderr, """\
 Usage: %s dirs...
@@ -32,8 +38,8 @@ def resultsTable(exps):
                                      for name in group) / rp["result"]
                                  for group in
                                  [["user", "nice"],
-                                  ["sys", "iowait", "irq", "softirq"],
-                                  ["idle"]]) +
+                                  ["sys", "irq", "softirq"],
+                                  ["idle", "iowait"]]) +
                             (rp["unit"],))
                 haveTimes = True
             else:
@@ -77,12 +83,14 @@ for name, exps in series(*sys.argv[1:]):
     print toShow.renderText()
     print
 
+    scaleRes, scaleTime = SCALE.get(fixed.className, (("sec", 1), ("secs", 1)))
+
     g, idx = graphs.get(fixed.className, (None, 0))
     if not g:
         g = graph.Gnuplot()
         g.title = fixed.className
         g.xlabel = "cores"
-        g.ylabel = fixed.units
+        g.ylabel = fixed.units.replace("/sec/", "/%s/" % scaleRes[0])
         g.yrange = "[0:*]"
         if "user" in tab.desc:
             # XXX Fudge, have to divide by amount of work.  Perhaps I
@@ -90,17 +98,19 @@ for name, exps in series(*sys.argv[1:]):
             # the job-oriented benchmarks) and use the measured real
             # time and core count to compute throughput here.  Then
             # use that to compute CPU time per work unit.
-            g.y2label = "CPU time (secs/%s)" % tunits
+            g.y2label = "CPU time (%s/%s)" % (scaleTime[0], tunits)
             g.y2tics = ""
             g.ytics = "nomirror"
 
-    g.addData(tab.project("cores", "result"),
+    projRes = lambda row: row.result * scaleRes[1]
+    g.addData(tab.project("cores", ("result", projRes)),
               with_ = "lines", title = name, linecolor = idx+1)
     if "user" in tab.desc:
         for n, t in [(6, "user"),  # Circle for wx terminal
                      (8, "sys"),   # Triangle
                      (2, "idle")]: # Cross
-            g.addData(tab.project("cores", t), axis = "x1y2",
+            projTime = lambda row: getattr(row, t) * scaleTime[1]
+            g.addData(tab.project("cores", (t, projTime)), axis = "x1y2",
                       with_ = "linespoints", title = name + " " + t,
                       linecolor = idx+1, pointtype = n)
 

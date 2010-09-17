@@ -17,11 +17,10 @@ class Mkdb(Task, ResultsProvider):
     ORDER_RR = intern("rr")
 
     __config__ = ["host", "psearchyPath", "filesPath", "dbPath",
-                  "mode", "order", "mem", "trial", "*sysmonOut"]
+                  "mode", "order", "mem", "dblim", "trial", "*sysmonOut"]
 
     def __init__(self, host, trial, psearchyPath, filesPath, dbPath, cores,
-                 mode = MODE_THREAD, order = ORDER_SEQ,
-                 mem = 256, sysmon = None):
+                 mode, order, mem, dblim, sysmon):
         assert mode in [Mkdb.MODE_THREAD, Mkdb.MODE_PROCESS], \
             "Invalid mode %s" % mode
         assert order in [Mkdb.ORDER_SEQ, Mkdb.ORDER_RR], \
@@ -37,6 +36,7 @@ class Mkdb(Task, ResultsProvider):
         self.mode = mode
         self.order = order
         self.mem = mem
+        self.dblim = dblim
         self.sysmon = sysmon
 
     def wait(self, m):
@@ -49,6 +49,8 @@ class Mkdb(Task, ResultsProvider):
             cmd.append("-p")
         if self.order == Mkdb.ORDER_RR:
             cmd.extend(["-s", "1"])
+        if self.dblim:
+            cmd.extend(["-l", str(self.dblim)])
         # XXX For the submission, we measured the entire time,
         # including file list loading.  That may be a more natural
         # definition of "job" even though the file list loading is
@@ -107,13 +109,14 @@ class Psearchy(object):
         files = Mkfiles(host, psearchyPath, cfg.textRoot)
         m += files
         m += PrefetchList(host, files.filesPath, reuse = True)
-        if cfg.hotplug:
-            m += SetCPUs(host = host, num = cfg.cores, seq = cfg.order)
+        # XXX Tell mkdb the CPU sequence
+        m += SetCPUs(host = host, num = cfg.cores, hotplug = cfg.hotplug,
+                     seq = cfg.order)
         sysmon = SystemMonitor(host)
         m += sysmon
         for trial in range(cfg.trials):
             m += Mkdb(host, trial, psearchyPath, files.filesPath, fs.path,
-                      cfg.cores, cfg.mode, cfg.order, cfg.mem,
+                      cfg.cores, cfg.mode, cfg.order, cfg.mem, cfg.dblim,
                       sysmon = sysmon)
         # XXX
         # m += cfg.monitors
