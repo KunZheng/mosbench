@@ -70,7 +70,18 @@ PROGS := app/kmeans 			    \
 	 app/hist			    \
 	 app/string_match		    \
 	 app/wrmem			    \
-	 micro/sf_sample
+	 micro/sf_sample		    \
+	 micro/memcpy_local		    \
+	 micro/memcpy_scan		    \
+	 micro/memread			    \
+	 micro/memwrite			    \
+	 micro/memread_dct0		    \
+	 micro/memread_remote		    \
+	 micro/memmultiread_remote	    \
+	 micro/memmultiread_remote2	    \
+	 micro/memread_scan		    \
+	 micro/fault			    \
+	 micro/config
 
 PROGS := $(addprefix $(O)/,$(PROGS))
 PROGS += $(addsuffix .sf,$(PROGS))
