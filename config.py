@@ -112,7 +112,7 @@ exim = mk(benchmark = exim.runner, nonConst = True)
 exim *= mk(eximBuild = "exim-mod")
 exim *= mk(eximPort = 2526)
 # XXX Rename this "clients"
-exim *= mk(eximClients = 64)
+exim *= mk(eximClients = 96)
 
 ##################################################################
 # Postgres
