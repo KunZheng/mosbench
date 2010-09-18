@@ -5,6 +5,8 @@ import sys, os, signal, subprocess, errno, time
 WARMUP = 3
 DURATION = 15
 
+CORES = file("/proc/cpuinfo").read().count("processor\t")
+
 def usage():
     print >> sys.stderr, "Usage: %s count port" % sys.argv[0]
     sys.exit(2)
@@ -27,7 +29,8 @@ def startLoad(count, port):
         # altogether).
         procs.append(
             subprocess.Popen(["./smtpbm", "127.0.0.1", str(port),
-                              "%d@mosbench.org" % i, "mosbench@mosbench.org"],
+                              "%d@mosbench.org" % i, "mosbench@mosbench.org",
+                              str(i % CORES)],
                              stdout = subprocess.PIPE))
         # Don't hit the system too hard
         time.sleep(0.05)
@@ -80,9 +83,8 @@ def stopCounting(procs):
         total += int(res.split()[0])
     print "Stopped"
     sys.stdout.flush()
-    cores = file("/proc/cpuinfo").read().count("processor\t")
     print "%d messages (%.2f messages/sec/core)" % \
-        (total, float(total)/DURATION/cores)
+        (total, float(total)/DURATION/CORES)
 
 def killall(procs, butPid = -1):
     wait = [p for p in procs if p.pid != butPid and p.poll() == None]
