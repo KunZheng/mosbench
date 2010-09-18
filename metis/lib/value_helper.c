@@ -78,6 +78,6 @@ values_mv(keyvals_t * dst, keyvals_t * src)
 	}
 	memcpy(&dst->vals[dst->len], src->vals, sizeof(void *) * src->len);
 	dst->len += src->len;
-	values_deep_free(src);
+	//values_deep_free(src);
     }
 }
