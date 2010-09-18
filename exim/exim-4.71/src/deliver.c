@@ -9,6 +9,24 @@
 
 /* The main code for delivering a message. */
 
+#if defined(MOSBENCH_CPU_BIND)
+#define _GNU_SOURCE
+#include <sched.h>
+
+static void bind_to_cpu(void)
+{
+  cpu_set_t cpuset;
+  int cpu;
+  
+  cpu = sched_getcpu();
+  if (cpu < 0)
+    return;
+  
+  CPU_ZERO(&cpuset);
+  CPU_SET(cpu, &cpuset);
+  sched_setaffinity(0, sizeof(cpuset), &cpuset);
+}
+#endif
 
 #include "exim.h"
 
@@ -1742,6 +1760,9 @@ if ((pid = fork()) == 0)
 #endif
   {
   BOOL replicate = TRUE;
+#if defined(MOSBENCH_CPU_BIND)
+  bind_to_cpu();
+#endif
 
   /* Prevent core dumps, as we don't want them in users' home directories.
   HP-UX doesn't have RLIMIT_CORE; I don't know how to do this in that
