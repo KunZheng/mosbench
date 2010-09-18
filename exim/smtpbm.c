@@ -1,5 +1,5 @@
 /*
- * smtpbm ip-address port username from-address
+ * smtpbm ip-address port username from-address [cpu]
  *
  * generate lots of mail to somebody's port 25.
  */
@@ -17,13 +17,14 @@
 #include <netinet/tcp.h>
 #include <signal.h>
 #include <sys/prctl.h>
+#include <sched.h>
 
 static int total;
 static double start;
 
 static void usage(void)
 {
-	fprintf(stderr, "Usage: smtpbm ip-address port username from-address\n");
+	fprintf(stderr, "Usage: smtpbm ip-address port username from-address [cpu]\n");
 	exit(1);
 }
 
@@ -151,8 +152,16 @@ int main(int argc, char ** argv)
 {
 	struct sockaddr_in sin;
 
-	if(argc != 5)
+	if(argc < 5)
 		usage();
+
+	if (argc > 5) {
+		cpu_set_t cpuset;
+		CPU_ZERO(&cpuset);
+		CPU_SET(atoi(argv[5]), &cpuset);
+		if (sched_setaffinity(0, sizeof(cpuset), &cpuset) < 0)
+			oops("setaffinity");
+	}
 
 	if(prctl(PR_SET_PDEATHSIG, SIGINT, 0, 0, 0) == -1)
 		oops("prctl");
