@@ -153,7 +153,7 @@ class Host(Task, SourceFileProvider):
         been indicates, this will simply be the host name of the
         target host."""
 
-        return self.__routes.get(target, self.host)
+        return self.__routes.get(target, target.host)
 
     def start(self, m):
         """Start this host.  Send source files and create the remote
@@ -268,8 +268,16 @@ class Host(Task, SourceFileProvider):
         # include/exclude rules.
         #
         # XXX This runs without the perflock
+        #
+        # XXX It would be awesome if we could avoid deleting remote
+        # .pyc and .o files, since this forces those to get rebuilt.
         cmd = ["rsync", "-aRs", "--out-format=%%oing %s: %%n%%L" % self.host,
-               "--delete-excluded"]
+               "--delete-excluded",
+               "--filter", "P *.pyc",
+               # XXX HACK HACK HACK.  Perhaps SourceFileProvider
+               # should provide protect patterns.
+               "--filter", "P *.o", "--filter", "P /home/amdragon/mosbench/memcached/mcload/mdc_udp"
+               ]
         parents = set()
         for sf in sfs:
             # If it's a directory, we need to tell rsync to recurse
