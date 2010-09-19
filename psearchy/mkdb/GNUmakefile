@@ -1,4 +1,4 @@
-CXXFLAGS := -O2 -Wall -MD # -g
+CXXFLAGS := -O2 -Wall -MD # -g -fno-omit-frame-pointer
 #CXXFLAGS += -I$(LDB)
 #LDFLAGS += -L/Users/kaashoek/hack/db-4.7.25.NC/build_unix/
 #LDFLAGS += -pg -lprofiler
@@ -17,4 +17,4 @@ pedsort: $(OBJS)
 
 .PHONY: clean
 clean: 
-	rm pedsort primes.C $(OBJS) $(OBJS:.o=.d)
+	rm -f pedsort primes.C $(OBJS) $(OBJS:.o=.d)
