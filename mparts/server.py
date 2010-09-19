@@ -113,12 +113,16 @@ class Process(object):
                     os.close(self.__dw)
                     self.__dw = None
         if check and code:
-            raise ValueError("%s exited with %d" % (self.__cmd, code))
+            if code < 0:
+                msg = "signal %d" % (-code)
+            else:
+                msg = "status %d" % code
+            raise ValueError("%s exited with %s" % (self.__cmd, msg))
         return code
 
 SHELL_SPECIALS = set("\\'\"`<>|; \t\n()[]?#$^&*=")
 def shellEscape(s):
-    if set(s).isdisjoint(SHELL_SPECIALS):
+    if not set(s).intersection(SHELL_SPECIALS):
         # No quoting necessary
         return s
     if not "'" in s:
@@ -177,6 +181,10 @@ class RemoteHost(object):
         elif desc == DISCARD:
             return file("/dev/null", "w")
         elif desc == STDERR:
+            #return sys.stderr
+            # XXX Doesn't always work (older kernels with
+            # non-interactive shells?), but the above fails to join
+            # the streams
             return file("/dev/stderr", "w")
         else:
             desc = os.path.expanduser(desc)
