@@ -1,11 +1,12 @@
-PG_CFLAGS = -g -Wall -O2 -fPIC
+PG_CFLAGS = -Wall -O2 -fPIC -g -fno-omit-frame-pointer
 PG_LDFLAGS = -Wl,--as-needed
 PG_CONFIG = --enable-nls --enable-integer-datetimes --enable-thread-safety \
 	--enable-debug --enable-depend --disable-rpath \
 	--with-gnu-ld --with-pgport=5432
 
-# Always enable lock stats
-PG_CFLAGS += -DLWLOCK_STATS -DLWLOCK_TIMING_STATS -fno-omit-frame-pointer
+# Enable lock stats (warning: this spends a non-trivial amount of time
+# in gettimeofday)
+#PG_CFLAGS += -DLWLOCK_STATS -DLWLOCK_TIMING_STATS
 
 # For debugging
 #PG_CFLAGS += -O0
