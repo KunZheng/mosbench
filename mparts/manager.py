@@ -5,7 +5,7 @@ import cPickle as pickle
 
 from util import Progress, maybeMakedirs
 
-__all__ = ["Manager", "Task", "ResultPath", "generateManagers"]
+__all__ = ["Manager", "Task", "WaitForUser", "ResultPath", "generateManagers"]
 
 STOPPED, RUNNING = range(2)
 
@@ -227,6 +227,11 @@ class Task(object):
         method that returns the object represented as some basic
         Python type."""
 
+        # XXX __config__ really ought to be called __info__ or
+        # something, since it records tons of non-configuration and is
+        # easy to confuse with the configuration space, which really
+        # is configuration.
+
         names = set()
         for cls in reversed(type(self).__mro__):
             if hasattr(cls, "__config__"):
@@ -273,6 +278,10 @@ class Task(object):
         for v in cls.__config__:
             if v in dct:
                 setattr(self, v, dct[v])
+
+class WaitForUser(Task):
+    def wait(self):
+        raw_input("Press enter to continue...")
 
 class ResultPath(Task):
     """A ResultPath tracks where to store the results of an
