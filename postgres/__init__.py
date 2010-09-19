@@ -175,7 +175,7 @@ class PostgresRunner(object):
             # Because the number of cores and the number of clients is
             # the same, we don't strictly need hotplug
             m += SetCPUs(host = host, num = cfg.cores)
-        # XXX Make configurable
+        # XXX Make configurable (at least iface name)
 #        m += IXGBE(host, "eth0", queues = "n*NCPU/(NRX if rx else NTX)")
         # The ixgbe driver assigns flows to queues sequentially.
         # Since we only have cfg.cores flows, make sure a sequential
