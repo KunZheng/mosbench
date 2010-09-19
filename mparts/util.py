@@ -1,4 +1,4 @@
-import sys, os, errno, socket, select
+import sys, os, errno, socket, select, threading
 
 class Progress(object):
     """A context manager that prints out progress messages before and
@@ -73,3 +73,36 @@ def isLocalhost(host):
     except socket.error:
         return False
     return a.getpeername()[1] == c.getsockname()[1]
+
+class Async(threading.Thread):
+    """Execute a function asynchronously.  The caller can use sync to
+    wait on and retrieve the function's result.  Inspired by Cilk's
+    spawn and Haskell's par."""
+
+    def __init__(self, fn, *args, **kwargs):
+        threading.Thread.__init__(self)
+        self.__fn = fn
+        self.__args = args
+        self.__kwargs = kwargs
+        self.__result = self.__exc = None
+        if 'daemon' in kwargs:
+            self.setDaemon(kwargs.pop('daemon'))
+        if 'threadname' in kwargs:
+            self.setName(kwargs.pop('threadname'))
+        self.start()
+
+    def run(self):
+        try:
+            self.__result = self.__fn(*self.__args, **self.__kwargs)
+        except:
+            self.__exc = sys.exc_info()
+
+    def sync(self):
+        """Wait for the function call to complete.  Returns the
+        function result.  If the function terminated with an
+        exception, re-raises that exception in this thread."""
+
+        self.join()
+        if self.__exc:
+            raise self.__exc[0], self.__exc[1], self.__exc[2]
+        return self.__result
