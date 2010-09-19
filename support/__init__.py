@@ -47,6 +47,16 @@ class IXGBE(Task, SourceFileProvider):
         self.__script = self.queueSrcFile(host, "ixgbe-set-affinity")
 
     def start(self):
+        # XXX Make this an option.  Deal with differently named
+        # modules on different kernels
+        for l in self.host.r.readFile("/proc/modules").splitlines():
+            modname = l.split()[0]
+            if modname.startswith("ixgbe"):
+                self.log("rmmod %s" % modname)
+                self.host.sudo.run(["rmmod", modname])
+        self.log("modprobe ixgbe-pin")
+        self.host.sudo.run(["modprobe", "ixgbe-pin"])
+
         self.log("Setting %s queue affinity to %s" % (self.iface, self.queues))
         self.host.sudo.run([self.__script, self.iface, self.queues],
                            stdout = self.host.getLogPath(self))
