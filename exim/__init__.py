@@ -46,7 +46,8 @@ class EximDaemon(Task):
         if self.__proc:
             self.stop()
 
-class Smtpbm(Task, ResultsProvider):
+__all__.append("EximLoad")
+class EximLoad(Task, ResultsProvider):
     __config__ = ["host", "trial", "eximPath", "clients", "port", "*sysmonOut"]
 
     # XXX Control warmup/duration
@@ -85,7 +86,7 @@ class Smtpbm(Task, ResultsProvider):
         self.setResults(int(ms[0]), "message", "messages",
                         self.sysmonOut["time.real"])
 
-class Exim(object):
+class EximRunner(object):
     def __str__(self):
         return "exim"
 
@@ -110,12 +111,12 @@ class Exim(object):
         sysmon = SystemMonitor(host)
         m += sysmon
         for trial in range(cfg.trials):
-            # XXX It would be a pain to make eximClients dependent on
+            # XXX It would be a pain to make clients dependent on
             # cfg.cores.
-            m += Smtpbm(host, trial, eximPath, cfg.cores,
-                        cfg.eximClients, cfg.eximPort, sysmon)
+            m += EximLoad(host, trial, eximPath, cfg.cores,
+                          cfg.clients, cfg.eximPort, sysmon)
         # m += cfg.monitors
         m.run()
 
 __all__.append("runner")
-runner = Exim()
+runner = EximRunner()

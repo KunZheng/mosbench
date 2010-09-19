@@ -14,8 +14,8 @@ __all__ = []
 WARMUP = 5
 DURATION = 15
 
-__all__.append("PGLoad")
-class PGLoad(Task, ResultsProvider, SourceFileProvider,
+__all__.append("PostgresLoad")
+class PostgresLoad(Task, ResultsProvider, SourceFileProvider,
              postgres.PGOptsProvider):
     __config__ = ["host", "trial", "clients", "rows", "partitions",
                   "batchSize", "randomWritePct", "*sysmonOut"]
@@ -25,7 +25,7 @@ class PGLoad(Task, ResultsProvider, SourceFileProvider,
         Task.__init__(self, host = host, trial = trial)
         ResultsProvider.__init__(self, cores)
         # XXX Use this elsewhere
-        self.setConfigAttrs(PGLoad, locals())
+        self.setConfigAttrs(PostgresLoad, locals())
         self.pg = pg
         self.sysmon = sysmon
         self.__dbname = "pg%d-%d" % (self.rows, self.partitions)
@@ -34,7 +34,7 @@ class PGLoad(Task, ResultsProvider, SourceFileProvider,
         self.queueSrcFile(host, "libload")
 
         if trial != 0:
-            # Only start one PGLoad object per data point
+            # Only start one PostgresLoad object per data point
             self.start = None
 
     def getPGOpts(self, pg):
@@ -135,8 +135,6 @@ def getBuild(cfg):
         build += "-lockscale"
     return build
 
-# XXX Use this naming convention elsewhere.  Put the nice name in the
-# ResultsProvider for the graphs.
 class PostgresRunner(object):
     def __str__(self):
         return "postgres"
@@ -186,9 +184,9 @@ class PostgresRunner(object):
         sysmon = ExplicitSystemMonitor(host)
         m += sysmon
         for trial in range(cfg.trials):
-            m += PGLoad(loadgen, trial, pg, cfg.cores, cfg.cores,
-                        cfg.rows, cfg.partitions, cfg.batchSize,
-                        cfg.randomWritePct, sysmon)
+            m += PostgresLoad(loadgen, trial, pg, cfg.cores, cfg.cores,
+                              cfg.rows, cfg.partitions, cfg.batchSize,
+                              cfg.randomWritePct, sysmon)
         m.run()
 
 __all__.append("runner")

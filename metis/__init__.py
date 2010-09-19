@@ -6,8 +6,8 @@ import os
 
 __all__ = []
 
-__all__.append("Wrmem")
-class Wrmem(Task, ResultsProvider):
+__all__.append("MetisLoad")
+class MetisLoad(Task, ResultsProvider):
     __config__ = ["host", "trial", "metisPath", "streamflow", "model",
                   "*sysmonOut"]
 
@@ -46,7 +46,7 @@ class Wrmem(Task, ResultsProvider):
         self.sysmonOut = self.sysmon.parseLog(log)
         self.setResults(1, "job", "jobs", self.sysmonOut["time.real"])
 
-class Metis(object):
+class MetisRunner(object):
     def __str__(self):
         return "metis"
 
@@ -66,10 +66,10 @@ class Metis(object):
         sysmon = SystemMonitor(host)
         m += sysmon
         for trial in range(cfg.trials):
-            m += Wrmem(host, trial, cfg.cores, metisPath, cfg.streamflow,
-                       cfg.model, setcpus, sysmon)
+            m += MetisLoad(host, trial, cfg.cores, metisPath, cfg.streamflow,
+                           cfg.model, setcpus, sysmon)
         # m += cfg.monitors
         m.run()
 
 __all__.append("runner")
-runner = Metis()
+runner = MetisRunner()

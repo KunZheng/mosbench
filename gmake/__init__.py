@@ -8,8 +8,8 @@ import os
 
 __all__ = []
 
-__all__.append("MakeKernel")
-class MakeKernel(Task, ResultsProvider, SourceFileProvider):
+__all__.append("GmakeLoad")
+class GmakeLoad(Task, ResultsProvider, SourceFileProvider):
     __config__ = ["host", "srcPath", "objPath", "*sysmonOut"]
 
     def __init__(self, host, trial, cores, srcPath, objPath, sysmon):
@@ -54,7 +54,7 @@ class MakeKernel(Task, ResultsProvider, SourceFileProvider):
         self.sysmonOut = self.sysmon.parseLog(log)
         self.setResults(1, "build", "builds", self.sysmonOut["time.real"])
 
-class Gmake(object):
+class GmakeRunner(object):
     def __str__(self):
         return "gmake"
 
@@ -76,10 +76,10 @@ class Gmake(object):
         sysmon = SystemMonitor(host)
         m += sysmon
         for trial in range(cfg.trials):
-            m += MakeKernel(host, trial, cfg.cores, cfg.kernelRoot, fs.path + "0",
-                            sysmon)
+            m += GmakeLoad(host, trial, cfg.cores, cfg.kernelRoot, fs.path + "0",
+                           sysmon)
         # m += cfg.monitors
         m.run()
 
 __all__.append("runner")
-runner = Gmake()
+runner = GmakeRunner()

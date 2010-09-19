@@ -2,6 +2,12 @@ from mparts.configspace import ConfigSpace
 from mparts.host import Host
 from support import perfLocked
 
+# If set to True, do as few experiments as quickly as possible to test
+# the setup.  This is useful to do before the full benchmark suite
+# because it will almost certainly uncover misconfigurations that
+# could halt a lengthy full benchmark part way through.
+sanityRun = True
+
 # For an explanation of configuration spaces and a description of why
 # we use '*' and '+' all over this file, see the module documentation
 # for mparts.configspace.  In short, * combines configuration options,
@@ -78,7 +84,10 @@ shared *= mk(fs = "tmpfs-separate")
 
 # trials is the number of times to run each benchmark.  The best
 # result will be taken.
-shared *= mk(trials = 3)
+if sanityRun:
+    shared *= mk(trials = 1)
+else:
+    shared *= mk(trials = 3)
 
 # monitors specifies the set of monitoring tasks to run during each
 # benchmark.  This can be overridden for individual benchmarks (though
@@ -93,13 +102,19 @@ shared *= mk(trials = 3)
 # this requires granting the benchmark user on the primary host sudo
 # access.  Note that the Exim benchmark REQUIRES hotplug to be
 # enabled, so either enable this or disable the Exim benchmark.
+#
+# XXX gmake requires, too?  In principle we could use numactl, but
+# that probably isn't worth the effort.
 shared *= mk(hotplug = True)
 
 # cores specifies the number of cores to use.  This must be
 # non-constant and must be the last variable in the shared
 # configuration for the graphing tools to work (which also means it
 # generally shouldn't be overridden per benchmark).
-shared *= mk(cores = [1] + range(0, 49, 4)[1:], nonConst = True)
+if sanityRun:
+    shared *= mk(cores = [48], nonConst = True)
+else:
+    shared *= mk(cores = [1] + range(0, 49, 4)[1:], nonConst = True)
 
 ##################################################################
 # Exim
@@ -111,8 +126,7 @@ exim = mk(benchmark = exim.runner, nonConst = True)
 
 exim *= mk(eximBuild = "exim-mod")
 exim *= mk(eximPort = 2526)
-# XXX Rename this "clients"
-exim *= mk(eximClients = 96)
+exim *= mk(clients = 96)
 
 ##################################################################
 # Postgres
@@ -156,13 +170,19 @@ import postgres
 
 postgres = mk(benchmark = postgres.runner, nonConst = True)
 
-# XXX
+# XXX Put in global config?
+#
+# This host must have the Postgres client library installed (libpq-dev
+# on Debian/Ubuntu).
 postgres *= mk(secondaryHost = josmp)
 
 postgres *= mk(rows = 10000000)
 postgres *= mk(partitions = 0)
 postgres *= mk(batchSize = 256)
-postgres *= mk(randomWritePct = [0, 5])
+if sanityRun:
+    postgres *= mk(randomWritePct = [5])
+else:
+    postgres *= mk(randomWritePct = [0, 5])
 
 pgopt = (mk(sleep = "sysv") * mk(semasPerSet = 16) *
          mk(lwScale = True) * mk(lockScale = True) *
@@ -201,8 +221,12 @@ import psearchy
 
 psearchy = mk(benchmark = psearchy.runner, nonConst = True)
 
-psearchy *= (mk(mode = ["thread"]) * mk(order = ["seq"]) +
-             mk(mode = ["process"]) * mk(order = ["seq", "rr"]))
+if sanityRun:
+    psearchy *= (mk(mode = ["thread"]) * mk(order = ["seq"]) +
+                 mk(mode = ["process"]) * mk(order = ["rr"]))
+else:
+    psearchy *= (mk(mode = ["thread"]) * mk(order = ["seq"]) +
+                 mk(mode = ["process"]) * mk(order = ["seq", "rr"]))
 psearchy *= mk(mem = 48)
 psearchy *= mk(dblim = 200000)
 
@@ -232,9 +256,10 @@ metis *= mk(order = ["rr"])
 # one configuration.  Furthermore, instead of computing the regular
 # product, we compute a "merge" product, where assignments from the
 # left will override assignments to the same variables from the right.
-#configSpace = (exim + gmake + psearchy + metis).merge(shared)
+configSpace = (exim + postgres + gmake + psearchy + metis).merge(shared)
+#configSpace = memcached.merge(shared)
 #configSpace = exim.merge(shared)
-configSpace = postgres.merge(shared)
+#configSpace = postgres.merge(shared)
 #configSpace = gmake.merge(shared)
 #configSpace = psearchy.merge(shared)
 #configSpace = metis.merge(shared)

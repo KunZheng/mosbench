@@ -8,8 +8,8 @@ import os
 
 __all__ = []
 
-__all__.append("Mkdb")
-class Mkdb(Task, ResultsProvider):
+__all__.append("PsearchyLoad")
+class PsearchyLoad(Task, ResultsProvider):
     MODE_THREAD = intern("thread")
     MODE_PROCESS = intern("process")
 
@@ -21,9 +21,9 @@ class Mkdb(Task, ResultsProvider):
 
     def __init__(self, host, trial, psearchyPath, filesPath, dbPath, cores,
                  mode, order, mem, dblim, sysmon):
-        assert mode in [Mkdb.MODE_THREAD, Mkdb.MODE_PROCESS], \
+        assert mode in [PsearchyLoad.MODE_THREAD, PsearchyLoad.MODE_PROCESS], \
             "Invalid mode %s" % mode
-        assert order in [Mkdb.ORDER_SEQ, Mkdb.ORDER_RR], \
+        assert order in [PsearchyLoad.ORDER_SEQ, PsearchyLoad.ORDER_RR], \
             "Invalid order %s" % order
 
         Task.__init__(self, host = host, trial = trial)
@@ -45,9 +45,9 @@ class Mkdb(Task, ResultsProvider):
                "-t", self.dbPath,
                "-c", str(self.cores),
                "-m", str(self.mem)]
-        if self.mode == Mkdb.MODE_PROCESS:
+        if self.mode == PsearchyLoad.MODE_PROCESS:
             cmd.append("-p")
-        if self.order == Mkdb.ORDER_RR:
+        if self.order == PsearchyLoad.ORDER_RR:
             cmd.extend(["-s", "1"])
         if self.dblim:
             cmd.extend(["-l", str(self.dblim)])
@@ -96,7 +96,7 @@ class Mkfiles(Task):
                 self.host.r.run(["mv", self.filesPath + ".tmp",
                                  self.filesPath])
 
-class Psearchy(object):
+class PsearchyRunner(object):
     def __str__(self):
         return "psearchy"
 
@@ -117,12 +117,12 @@ class Psearchy(object):
         sysmon = SystemMonitor(host)
         m += sysmon
         for trial in range(cfg.trials):
-            m += Mkdb(host, trial, psearchyPath, files.filesPath, fs.path,
-                      cfg.cores, cfg.mode, cfg.order, cfg.mem, cfg.dblim,
-                      sysmon = sysmon)
+            m += PsearchyLoad(host, trial, psearchyPath, files.filesPath,
+                              fs.path, cfg.cores, cfg.mode, cfg.order, cfg.mem,
+                              cfg.dblim, sysmon)
         # XXX
         # m += cfg.monitors
         m.run()
 
 __all__.append("runner")
-runner = Psearchy()
+runner = PsearchyRunner()
