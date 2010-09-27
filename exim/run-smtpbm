@@ -28,9 +28,10 @@ def startLoad(count, port):
         # exception handling much simpler (and often absent
         # altogether).
         procs.append(
-            subprocess.Popen(["./smtpbm", "127.0.0.1", str(port),
+            subprocess.Popen(["numactl", "-C", str(i % CORES),
+                              "./smtpbm", "127.0.0.1", str(port),
                               "%d@mosbench.org" % i, "mosbench@mosbench.org",
-                              str(i % CORES)],
+                              ],
                              stdout = subprocess.PIPE))
         # Don't hit the system too hard
         time.sleep(0.05)
