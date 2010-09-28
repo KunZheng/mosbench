@@ -79,6 +79,7 @@ class LinuxIXGBE(RSSHash):
         # indirection table to use, thus the 0x11).  In reality, each
         # block of four entries is actually in *reverse* order because
         # of the way the Linux driver constructs the entry.
+        queues = max(IXGBE_MAX_RSS_INDICES, onlineCPUs)
         reta = (range(queues) * 128)[:128]
         for i in range(0, 128, 4):
             reta[i:i+4] = reta[i:i+4][::-1]
