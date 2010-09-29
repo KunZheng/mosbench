@@ -15,6 +15,8 @@ DISCARD = "\0DISCARD"
 CHECKED = "CHECKED"
 UNCHECKED = "UNCHECKED"
 
+popenLock = threading.Lock()
+
 class Process(object):
     def __init__(self, cmd, p, dw):
         self.__cmd = cmd
@@ -181,11 +183,11 @@ class RemoteHost(object):
         elif desc == DISCARD:
             return file("/dev/null", "w")
         elif desc == STDERR:
-            #return sys.stderr
+            return sys.stderr
             # XXX Doesn't always work (older kernels with
             # non-interactive shells?), but the above fails to join
             # the streams
-            return file("/dev/stderr", "w")
+            #return file("/dev/stderr", "w")
         else:
             desc = os.path.expanduser(desc)
             if not noCheck:
@@ -240,9 +242,14 @@ class RemoteHost(object):
             print >> sys.stderr, \
                 "=%s= %s" % (self.__name, " ".join(map(shellEscape, cmd)))
         try:
-            p = subprocess.Popen(cmd, stdin = pstdin, stdout = pstdout,
-                                 stderr = pstderr, preexec_fn = preexec,
-                                 shell = shell, cwd = cwd, env = env)
+            # Ugh.  Popen as of Python 2.6 isn't thread-safe.  See
+            # Python issue 2320.  A better solution would be
+            # close_fds=True, but that fails for some reason (XXX
+            # track down).
+            with popenLock:
+                p = subprocess.Popen(cmd, stdin = pstdin, stdout = pstdout,
+                                     stderr = pstderr, preexec_fn = preexec,
+                                     shell = shell, cwd = cwd, env = env)
         except:
             if dw:
                 os.close(dw)
