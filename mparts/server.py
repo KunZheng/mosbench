@@ -182,12 +182,6 @@ class RemoteHost(object):
             return subprocess.PIPE
         elif desc == DISCARD:
             return file("/dev/null", "w")
-        elif desc == STDERR:
-            return sys.stderr
-            # XXX Doesn't always work (older kernels with
-            # non-interactive shells?), but the above fails to join
-            # the streams
-            #return file("/dev/stderr", "w")
         else:
             desc = os.path.expanduser(desc)
             if not noCheck:
@@ -208,10 +202,17 @@ class RemoteHost(object):
             raise ValueError("Illegal stdin %s" % stdin)
         else:
             pstdin = file(os.path.expanduser(stdin), "r")
-        if stdout == stderr:
-            pstdout = pstderr = self.__toOutFile(stdout, noCheck)
+
+        if stdout == stderr == STDERR:
+            # subprocess is really finicky.  If you pass the same
+            # FD for both stdout and stderr, it will get closed.
+            pstdout = os.dup(2)
         else:
             pstdout = self.__toOutFile(stdout, noCheck)
+
+        if stderr == STDERR:
+            pstderr = None
+        else:
             pstderr = self.__toOutFile(stderr, noCheck)
 
         # Expand user
