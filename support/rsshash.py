@@ -2,7 +2,7 @@
 Receive-Side Scaling and implemented by the Intel IXGBE, as well as
 the RSS queue-assignment scheme used in Linux's IXGBE driver."""
 
-__all__ = ["RSSHash", "LinuxIXGBE"]
+__all__ = ["RSSHash", "LinuxIXGBE", "PortGenerator"]
 
 import socket
 
@@ -124,6 +124,26 @@ def testQueues():
         # Whoa, what?  80107 is not a valid port.
         src &= 0xFFFF
         assert(h.queueOf(h.ipv4UDP(tom, 11211 + n, josmp, src) == n % 16))
+
+class PortGenerator(object):
+    """Generate a set of destination port numbers based on desired RSS
+    queuing behavior."""
+
+    def __init__(self, onlineCPUs, first):
+        self.__h = LinuxIXGBE(onlineCPUs)
+        self.__first = first
+        self.__used = set()
+
+    def genIPv4UDP(self, src, srcPort, dst, dstQueue):
+        h = self.__h
+        for dp in range(self.__first, 65536):
+            if dp in self.__used:
+                continue
+            if h.queueOf(h.ipv4UDP(src, srcPort, dst, dp)) == dstQueue:
+                self.__used.add(dp)
+                return dp
+        raise ValueError("Failed to find port from %s:%d to queue %d of %s" %
+                         (src, srcPort, dstQueue, dst))
 
 if __name__ == "__main__":
     testHash()
