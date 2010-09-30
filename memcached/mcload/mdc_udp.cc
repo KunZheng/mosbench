@@ -6,17 +6,17 @@
 #include <netinet/in.h>
 #include <sys/time.h>
 #include <fcntl.h>
+#include <signal.h>
+#include <errno.h>
 
 #include <vector>
 #include <sstream>
 
+// XXX Can get rid of this, too
 #include "atomic_32.h"
-#include "fifo.h"
 #include "method_thread.h"
-#include "time_profile.h"
 
 #define TIMEOUT		100000
-//#define TIMEOUT		10
 
 #define BATCH           20
 
@@ -30,8 +30,6 @@ struct server *servers;
 int num_servers = 0;
 int base_port = 11211;
 int source_port = -1;
-
-char localhost[64];
 
 const char *master_host = "hooverdam.lcs.mit.edu";
 const int master_port = 4344;
@@ -52,18 +50,9 @@ static pid_t gettid(void)
   return syscall(__NR_gettid);
 }
 
-/*
-struct udp_header {
-  uint16_t id;          //Request ID
-  uint16_t seq_num;     //Sequence number
-  uint16_t pkts;        //Total number of datagrams in this message
-  uint16_t rsvd;        //Reserved for future use; must be 0
-};
-*/
-
 class worker_t {
  public:
-  worker_t(fifo<int> *j) : join(j) {
+  worker_t() {
     atomic_set(&counter, 0);
     atomic_set(&drops, 0);
 
@@ -74,15 +63,16 @@ class worker_t {
   }
 
   int get_count() {
-    int count = atomic_read(&counter);
-    atomic_set(&counter, 0);
-    return count;
+    return atomic_read(&counter);
   }
 
   int get_drops() {
-    int drop = atomic_read(&drops);
+    return atomic_read(&drops);
+  }
+
+  void reset() {
+    atomic_set(&counter, 0);
     atomic_set(&drops, 0);
-    return drop;
   }
 
   void work() {
@@ -91,9 +81,9 @@ class worker_t {
 
     for (int i = 0; i < num_servers; i++) {
         struct sockaddr_in sbind;
-	//struct timeval tv;
-	//tv.tv_sec = 0;
-	//tv.tv_usec = TIMEOUT;
+	struct timeval tv;
+	tv.tv_sec = 0;
+	tv.tv_usec = TIMEOUT;
 
         errno_check(s[i] = socket(PF_INET, SOCK_DGRAM, 0));
 
@@ -107,8 +97,8 @@ class worker_t {
         errno_check(connect(s[i],
                             (struct sockaddr *)&servers[i].sin,
                             sizeof(servers[i].sin)));
-        //errno_check(setsockopt(s[i], SOL_SOCKET, SO_RCVTIMEO, (void *) &tv, sizeof(tv)));
-        fprintf(stderr, "connected to %s\n", servers[i].host);
+        errno_check(setsockopt(s[i], SOL_SOCKET, SO_RCVTIMEO, (void *) &tv, sizeof(tv)));
+        printf("connected to %s\n", servers[i].host);
     }
 
     char rcv_buf[1024]; 
@@ -118,11 +108,6 @@ class worker_t {
     packet_buf16[1] = htons(0);
     packet_buf16[2] = htons(1);
     packet_buf16[3] = htons(0);
-
-    //*packet_data++ = 'g';
-    //*packet_data++ = 'e';
-    //*packet_data++ = 't';
-    //*packet_data++ = ' ';
 
 #define REQ "get 0123456789\r\n"
     memcpy(packet_data, REQ, strlen(REQ));
@@ -136,25 +121,7 @@ class worker_t {
         sn = rand() % num_servers;
       
       for (int i = 0; i < BATCH; i++) {
-        //int i;
         packet_buf16[0] = htons(id++);
-
-        //for (i = 0; i < 10; i++) {
-        //  *(packet_data + i) = (char)('a' + rand() % ('z' - 'a'));
-        //}
-
-        //*(packet_data + i + 1) = '\r';
-        //*(packet_data + i + 2) = '\n';
-        //*(packet_data + i + 3) = '\0';
-
-        /*
-        for (uint32_t i = 0; i < strlen(packet_buf + 8) + 8; i++) {
-          if (i < 8)
-            printf("%d %d\n", i, packet_buf[i]);
-          else
-            printf("%d %c\n", i, packet_buf[i]);
-        }
-        */
         errno_check(write(s[sn], packet_buf, 8 + 4 + 10 + 3));
       }
 
@@ -175,22 +142,19 @@ class worker_t {
     }
   }
 
-  void worker_thread(int cpu_id) {
+  void worker_thread() {
     tid = gettid();
     work();
-    join->enq(tid);
   }
 
-  void start(int cpu_id) {
-    assert(join);
-    if(method_thread(this, true, &worker_t::worker_thread, cpu_id) == 0){
+  void start() {
+    if(method_thread(this, true, &worker_t::worker_thread) == 0){
       perror("pthread_create");
       exit(1);
     }
   }
 
  private:
-  fifo<int> *join;
   int tid;
   atomic_t counter;
   atomic_t drops;
@@ -203,67 +167,6 @@ class worker_t {
     random_r(&rand_data, &rand);
     return rand;
   }
-};
-
-class timert_t {
- public:
-  timert_t(std::vector<worker_t> *w) : workers(w) {}
-
-  void work() {
-    struct sockaddr_in sin;
-    struct hostent *hp;
-    int s, fd;
-
-    errno_check(fd = open("/tmp/mdc.log", O_WRONLY|O_TRUNC|O_CREAT, S_IRUSR|S_IWUSR));
-
-    if(!(hp = gethostbyname(master_host))) {
-      fprintf(stderr, "unable to resolve host: %s\n", strerror(errno));
-      exit(EXIT_FAILURE);
-    }
-
-    memset(&sin, 0, sizeof(sin));
-
-    sin.sin_family = AF_INET;
-    sin.sin_addr = *((struct in_addr*) hp->h_addr_list[0]);
-    sin.sin_port = htons(master_port);
-
-    errno_check(s = socket(PF_INET, SOCK_STREAM, 0));
-    errno_check(connect(s, (struct sockaddr *)&sin, sizeof(sin)));
-
-    while (1) {
-      char buf[128];
-      int sum_count = 0;
-      int sum_drops = 0;
-
-      for (uint32_t i = 0; i < workers->size(); i++)
-        sum_count += workers->at(i).get_count();
-
-      for (uint32_t i = 0; i < workers->size(); i++)
-        sum_drops += workers->at(i).get_drops();
-
-      snprintf(buf, 128, "%s %d %d\n", localhost, sum_count, sum_drops);
-      write(s, buf, strlen(buf));
-      write(fd, buf, strlen(buf));
-
-      sleep(1);
-    }
-  }
-
-  void worker_thread(int cpu_id) {
-    tid = gettid();
-    work();
-  }
-
-  void start(int cpu_id) {
-    if(method_thread(this, true, &timert_t::worker_thread, cpu_id) == 0){
-      perror("pthread_create");
-      exit(1);
-    }
-  }
-
- private:
-  std::vector<worker_t> *workers;
-  int tid;
 };
 
 void
@@ -289,18 +192,41 @@ void usage(const char *prog_name) {
     fprintf(stderr, "%s [-p base_port] [-s source_port] hostip num_workers num_servers\n", prog_name);
 }
 
+std::vector<worker_t> *workers;
+
+void reset_counts(int x) {
+  for (int i = 0; i < (int)workers->size(); i++)
+    workers->at(i).reset();
+}
+
+void print_count(int x) {
+  int total = 0, drops = 0;
+  for (int i = 0; i < (int)workers->size(); i++) {
+    int t = workers->at(i).get_count(),
+      d = workers->at(i).get_drops();
+    printf("Worker %d: %d requests, %d drops\n", i, t, d);
+    total += t;
+    drops += d;
+  }
+  printf("%d requests, %d drops\n", total, drops);
+  fflush(stdout);
+}
+
+void on_int(int x) {
+  exit(0);
+}
+
 int
 main(int argc, char **argv) {
   int num_workers = 0;
   const char *hostip;
-  fifo<int> join;
   int opt;
 
   while ((opt = getopt(argc, argv, "p:s:")) != -1) {
     switch (opt) {
     case 'p':
       base_port = atoi(optarg);
-      fprintf(stderr, "base_port = %d\n", base_port);
+      printf("base_port = %d\n", base_port);
       break;
     case 's':
       source_port = atoi(optarg);
@@ -323,42 +249,40 @@ main(int argc, char **argv) {
   num_workers = atoi(argv[optind + 1]);
   num_servers = atoi(argv[optind + 2]);
 
-  //printf("connecting to %s\n", hostip);
-  //printf("workers: %d servers: %d port: %d\n", num_workers, num_servers, base_port);
-
-  int fd;
-  ssize_t len;
-  errno_check(fd = open("/etc/hostname", O_RDONLY));
-  len = read(fd, localhost, 64);
-  errno_check(len);
-  if (len < 64)
-    localhost[len-1] = '\0';
-  else
-    errno_check(-1);
-
-  std::vector<worker_t> *workers;
-  workers = new std::vector<worker_t>(num_workers, &join);
+  workers = new std::vector<worker_t>(num_workers);
   servers = new struct server[num_servers];
 
   init(hostip);
 
-  timert_t timer(workers);
-  timer.start(0);
+  // Install signal handlers.  We do this late so we'll die if we get a
+  // signal before the workers are up.
+  signal(SIGUSR1, reset_counts);
+  signal(SIGUSR2, print_count);
+  signal(SIGINT, on_int);
 
-  time_profile_init();
-  timer_start(0, "global");
+  // Block signals while we're starting the workers so they'll inherit
+  // this signal mask.
+  sigset_t sigs;
+  sigemptyset(&sigs);
+  sigaddset(&sigs, SIGUSR1);
+  sigaddset(&sigs, SIGUSR2);
+  sigaddset(&sigs, SIGINT);
+  pthread_sigmask(SIG_BLOCK, &sigs, NULL);
 
   for (int i = 0; i < (int)workers->size(); i++)
-    workers->at(i).start(i);
+    workers->at(i).start();
 
-  int done = 0;
-  while (done < num_workers) {
-    join.deq();
-    done++;
-  }
+  // Unblock signals in just this thread
+  pthread_sigmask(SIG_UNBLOCK, &sigs, NULL);
 
-  timer_stop(0, "global");
-  timer_print("global");
+  // Wait for workers to start
+  for (int i = 0; i < (int)workers->size(); i++)
+    while (workers->at(i).get_count() == 0 &&
+           workers->at(i).get_drops() == 0)
+      usleep(100000);           // 100 ms
+
+  while (true)
+    pause();
 
   return 0;
 }
