@@ -230,7 +230,7 @@ main(int argc, char **argv) {
       break;
     case 's':
       source_port = atoi(optarg);
-      fprintf(stderr, "source_port = %d\n", source_port);
+      printf("source_port = %d\n", source_port);
       break;
     default:
       fprintf(stderr, "unknown option -%c\n", opt);

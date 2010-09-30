@@ -1,6 +1,6 @@
 from mparts.configspace import ConfigSpace
-from mparts.host import Host
-from support import perfLocked
+
+import clients
 
 # If set to True, do as few experiments as quickly as possible to test
 # the setup.  This is useful to do before the full benchmark suite
@@ -40,26 +40,16 @@ shared = ConfigSpace.unit()
 # must work from all of the hosts.  Don't use "localhost" (though the
 # driver will detect if it is running on one of these hosts and forgo
 # ssh automatically).
+#
+# XXX This is somewhat out of date.  Perhaps it should go in
+# clients.py.
 
-# Use "cmdModifier = perfLocked" if you use the "perflock" script to
-# prevent conflicting machine access.  You probably don't.
-tom = Host("tom.csail.mit.edu", cmdModifier = perfLocked)
-josmp = Host("josmp.csail.mit.edu")
-
-shared *= mk(primaryHost = tom)
+shared *= mk(primaryHost = clients.primaryHost)
 # Careful, mk treats a list as a set of alternate configurations, so
 # you probably want to pass a list with a single element that is a
 # list of secondary hosts.
 # XXX
 #shared *= mk(secondaryHosts = [[josmp]])
-
-# For hosts have fast network links on alternate interfaces, specify
-# the appropriate links here.  It's best if these are symmetrical.
-def addRoute(host1, ip1, host2, ip2):
-    # host1 has ip1 and host2 has ip2.
-    host1.addRoute(host2, ip2)
-    host2.addRoute(host1, ip1)
-addRoute(tom, "192.168.42.11", josmp, "192.168.42.10")
 
 # benchRoot specifies the directory on the primary host where MOSBENCH
 # was checked out or unpacked.
@@ -129,6 +119,16 @@ exim *= mk(eximPort = 2526)
 exim *= mk(clients = 96)
 
 ##################################################################
+# memcached
+#
+
+import memcached
+
+memcached = mk(benchmark = memcached.runner, nonConst = True)
+
+memcached *= mk(getLoadHosts = clients.getMemcacheClients)
+
+##################################################################
 # Postgres
 #
 # rows - The number of rows in the database.
@@ -174,7 +174,7 @@ postgres = mk(benchmark = postgres.runner, nonConst = True)
 #
 # This host must have the Postgres client library installed (libpq-dev
 # on Debian/Ubuntu).
-postgres *= mk(secondaryHost = josmp)
+postgres *= mk(secondaryHost = clients.postgresClient)
 
 postgres *= mk(rows = 10000000)
 postgres *= mk(partitions = 0)
@@ -239,7 +239,7 @@ import metis
 metis = mk(benchmark = metis.runner, nonConst = True)
 
 metis *= mk(streamflow = True)
-metis *= mk(model = ["default", "hugetlb"])
+metis *= mk(model = ["hugetlb", "default"])
 metis *= mk(order = ["rr"])
 
 ##################################################################
@@ -256,13 +256,15 @@ metis *= mk(order = ["rr"])
 # one configuration.  Furthermore, instead of computing the regular
 # product, we compute a "merge" product, where assignments from the
 # left will override assignments to the same variables from the right.
-configSpace = (exim + postgres + gmake + psearchy + metis).merge(shared)
-#configSpace = memcached.merge(shared)
+#configSpace = (exim + postgres + gmake + psearchy + metis).merge(shared)
+#configSpace = (postgres + gmake + psearchy + metis).merge(shared)
+configSpace = memcached.merge(shared)
 #configSpace = exim.merge(shared)
 #configSpace = postgres.merge(shared)
 #configSpace = gmake.merge(shared)
 #configSpace = psearchy.merge(shared)
 #configSpace = metis.merge(shared)
+#configSpace = (metis + exim).merge(shared)
 
 ##################################################################
 # Run

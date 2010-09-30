@@ -1,4 +1,4 @@
-TARGETS=exim postgres gmake psearchy metis
+TARGETS=memcached exim postgres gmake psearchy metis
 
 all: $(addprefix all-,$(TARGETS))
 clean: $(addprefix clean-,$(TARGETS))
@@ -10,6 +10,12 @@ all-libdb: always
 
 clean-libdb: always
 	$(MAKE) -C libdb clean
+
+all-memcached: always
+	$(MAKE) -C memcached all
+
+clean-memcached: always
+	$(MAKE) -C memcached clean
 
 all-exim: all-libdb always
 	$(MAKE) -C exim all

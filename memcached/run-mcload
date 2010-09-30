@@ -1,0 +1,45 @@
+#!/bin/sh
+
+set -e
+
+# Because of the load memcached puts on the network, the driver often
+# can't get an RPC in edgewise and thus can't deliver the monitoring
+# signals.  Thus, we instead deliver the signals locally and give
+# ourselves enough margin before and after the monitoring period that
+# all of the clients should be running at full speed during the local
+# monitoring period, even if they're not all monitoring the exact same
+# period.
+
+STARTTIME=$1
+SYNCTIME=$2
+DURATION=$3
+shift 3
+
+# Let the driver get things started everywhere in a timely fashion
+# before we start hammering the network and screwing up its RPC's.
+sleep $STARTTIME
+
+# Start the load generator
+"$@" &
+PID=$!
+
+# Wait long enough that all of the load generators should be up.  This
+# also acts as our warmup.
+sleep $SYNCTIME
+
+# Start measuring
+kill -USR1 $PID
+
+# Measure
+sleep $DURATION
+
+# Stop measuring
+kill -USR2 $PID
+
+# Keep going for long enough that all of the load generators should
+# finish their measurement period
+sleep $SYNCTIME
+
+# Bring it down
+kill -INT $PID
+wait $PID
