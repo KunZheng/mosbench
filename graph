@@ -8,10 +8,21 @@ import sys, os
 import optparse
 
 SCALE = {"MakeKernel" : (("hour", 60*60), ("secs", 1)),
+         "GmakeLoad" : (("hour", 60*60), ("secs", 1)),
+
          "Smtpbm" : (("sec", 1), ("microsecs", 1000*1000)),
+         "EximLoad" : (("sec", 1), ("microsecs", 1000*1000)),
+
          "Mkdb" : (("hour", 60*60), ("secs", 1)),
+         "PsearchyLoad" : (("hour", 60*60), ("secs", 1)),
+
          "Wrmem" : (("hour", 60*60), ("secs", 1)),
+         "MetisLoad" : (("hour", 60*60), ("secs", 1)),
+
          "PGLoad" : (("sec", 1), ("microsecs", 1000*1000)),
+         "PostgresLoad" : (("sec", 1), ("microsecs", 1000*1000)),
+
+         "MemcachedLoad" : (("sec", 1), ("microsecs", 1000*1000)),
          }
 
 def parseArgs(args):
@@ -23,6 +34,9 @@ directories given as arguments and graph those data points.  Separate
 benchmark types will be plotted in separate graphs."""
 
     parser = optparse.OptionParser(usage = usage)
+    parser.add_option("-d", "--data", dest = "mode", action="store_const",
+                      const = "data", default = "graph",
+                      help = "emit only data tables")
     parser.add_option("-p", "--strip", dest = "strip", type = "int",
                       default = 0, help = "strip NUM path elements from key",
                       metavar = "NUM")
@@ -88,7 +102,7 @@ opts, paths = parseArgs(sys.argv[1:])
 
 graphs = {}
 for name, exps in series(*paths):
-    name = "/".join(name.split("/")[opts.strip:])
+    name = name.split("/", opts.strip)[-1]
 
     tab = resultsTable(exps)
     fixed = the(tab.project("className", "units"))
@@ -99,11 +113,17 @@ for name, exps in series(*paths):
                 ("idle/"+tunits, "idle"))
     else:
         rest = ()
-    toShow = tab.project("path", "cores", (None, "className"),
+    toShow = tab.project("path", #("path", lambda row: row.path.split("/", 2)[-1]),
+                         "cores", (None, "className"),
                          (fixed.units, "result"), (None, "units"),
                          "real", *rest)
+    print "# %s" % name
     print toShow.renderText()
     print
+    print
+
+    if opts.mode == "data":
+        continue
 
     scaleRes, scaleTime = SCALE.get(fixed.className, (("sec", 1), ("secs", 1)))
 
@@ -121,9 +141,24 @@ for name, exps in series(*paths):
                 g.y2range = "[0:%g]" % opts.y2Max
             g.ytics = "nomirror"
 
+    # # Differential curve
+    # pres = pcores = 0
+    # curve = []
+    # for (cores, res) in tab.project("cores", "result"):
+    #     res *= cores
+    #     curve.append((cores, (res - pres) / (cores - pcores)))
+    #     pres, pcores = res, cores
+
+    # # Total throughput curve
+    # curve = []
+    # for (cores, res) in tab.project("cores", "result"):
+    #     curve.append((cores, res * cores))
+
+    # Per-core throughput curve
     projRes = lambda row: row.result * scaleRes[1]
-    g.addData(tab.project("cores", ("result", projRes)),
-              with_ = "lines", title = name, linecolor = idx+1)
+    curve = tab.project("cores", ("result", projRes))
+
+    g.addData(curve, with_ = "lines", title = name, linecolor = idx+1)
     if "user" in tab.desc:
         for n, t in [(6, "user"),  # Circle for wx terminal
                      (8, "sys"),   # Triangle
