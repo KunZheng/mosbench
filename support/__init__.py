@@ -202,11 +202,10 @@ class FileSystem(Task, SourceFileProvider):
         Task.__init__(self, host = host, fstype = fstype)
         self.host = host
         self.fstype = fstype
-        self.clean = clean
+        self.__clean = clean
         assert '/' not in fstype
         self.path = "/tmp/mosbench/%s/" % fstype
-        if clean:
-            self.__script = self.queueSrcFile(host, "cleanfs")
+        self.__script = self.queueSrcFile(host, "cleanfs")
 
     def start(self):
         # Check that the file system exists.  We check the mount table
@@ -222,8 +221,11 @@ class FileSystem(Task, SourceFileProvider):
                 (mountCheck, self.fstype, self.host))
 
         # Clean
-        if self.clean:
-            self.host.r.run([self.__script, self.fstype])
+        if self.__clean:
+            self.clean()
+
+    def clean(self):
+        self.host.r.run([self.__script, self.fstype])
 
 __all__.append("waitForLog")
 def waitForLog(host, logPath, name, secs, string):

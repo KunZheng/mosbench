@@ -12,7 +12,7 @@ class MetisLoad(Task, ResultsProvider):
                   "*sysmonOut"]
 
     def __init__(self, host, trial, cores, metisPath, streamflow, model,
-                 setcpus, sysmon):
+                 setcpus, fs, sysmon):
         assert model in ["default", "hugetlb"], \
             "Unknown Metis memory model %r" % model
 
@@ -24,9 +24,16 @@ class MetisLoad(Task, ResultsProvider):
         self.streamflow = streamflow
         self.model = model
         self.setcpus = setcpus
+        self.fs = fs
         self.sysmon = sysmon
 
     def wait(self, m):
+        # Clean the file system.  Metis assumes memory it allocates
+        # from hugetlbfs will be zeroed, so we can't have stale page
+        # files sitting around.
+        if self.fs:
+            self.fs.clean()
+
         cpuseq = ",".join(map(str, self.setcpus.getSeq()))
 
         obj = os.path.join(self.metisPath, "obj." + self.model)
@@ -57,8 +64,11 @@ class MetisRunner(object):
         m += host
         m += HostInfo(host)
         if cfg.model == "hugetlb":
-            fs = FileSystem(host, "hugetlb", clean = True)
+            # We explicitly clean before each trial
+            fs = FileSystem(host, "hugetlb", clean = False)
             m += fs
+        else:
+            fs = None
         metisPath = os.path.join(cfg.benchRoot, "metis")
         setcpus = SetCPUs(host = host, num = cfg.cores, hotplug = cfg.hotplug,
                           seq = cfg.order)
@@ -67,7 +77,7 @@ class MetisRunner(object):
         m += sysmon
         for trial in range(cfg.trials):
             m += MetisLoad(host, trial, cfg.cores, metisPath, cfg.streamflow,
-                           cfg.model, setcpus, sysmon)
+                           cfg.model, setcpus, fs, sysmon)
         # m += cfg.monitors
         m.run()
 
