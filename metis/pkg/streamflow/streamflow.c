@@ -268,8 +268,8 @@ static inline unsigned long get_cycles(void);
 // Thus, we mmap 8MB at once to reduce the number of mmaps to the kernel.
 // Setting segsize to 0 to direct all mmaps to kernel.
 //enum { segsize = SPAGE_SM * 1024 * 1024 };
-//enum { segsize = 128 * 1024 * 1024 };
-enum { segsize = 0 };
+enum { segsize = 128 * 1024 * 1024 };
+//enum { segsize = 0 };
 
 #include <inttypes.h>
 
