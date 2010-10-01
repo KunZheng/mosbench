@@ -16,8 +16,8 @@ class PsearchyLoad(Task, ResultsProvider):
     ORDER_SEQ = intern("seq")
     ORDER_RR = intern("rr")
 
-    __config__ = ["host", "psearchyPath", "filesPath", "dbPath",
-                  "mode", "order", "mem", "dblim", "trial", "*sysmonOut"]
+    __info__ = ["host", "psearchyPath", "filesPath", "dbPath",
+                "mode", "order", "mem", "dblim", "trial", "*sysmonOut"]
 
     def __init__(self, host, trial, psearchyPath, filesPath, dbPath, cores,
                  mode, order, mem, dblim, sysmon):
@@ -71,7 +71,7 @@ class PsearchyLoad(Task, ResultsProvider):
 
 __all__.append("Mkfiles")
 class Mkfiles(Task):
-    __config__ = ["host", "psearchyPath", "baseDir"]
+    __info__ = ["host", "psearchyPath", "baseDir"]
 
     def __init__(self, host, psearchyPath, baseDir):
         Task.__init__(self, host = host)

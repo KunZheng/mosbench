@@ -8,8 +8,8 @@ __all__ = []
 
 __all__.append("MetisLoad")
 class MetisLoad(Task, ResultsProvider):
-    __config__ = ["host", "trial", "metisPath", "streamflow", "model",
-                  "*sysmonOut"]
+    __info__ = ["host", "trial", "metisPath", "streamflow", "model",
+                "*sysmonOut"]
 
     def __init__(self, host, trial, cores, metisPath, streamflow, model,
                  setcpus, fs, sysmon):

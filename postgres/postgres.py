@@ -11,7 +11,7 @@ __all__ = ["InitDB", "Postgres", "PGVal", "PGOptsProvider"]
 USE_DEBUG_LIBC = False
 
 class InitDB(Task):
-    __config__ = ["host", "dbdir"]
+    __info__ = ["host", "dbdir"]
 
     def __init__(self, host, pg):
         dbdir = pg.dbdir
@@ -53,7 +53,7 @@ class InitDB(Task):
                                   hba, noCheck = True, append = True)
 
 class Postgres(Task):
-    __config__ = ["host", "pgPath", "pgBuild", "dbdir", "malloc", "*dynOpts"]
+    __info__ = ["host", "pgPath", "pgBuild", "dbdir", "malloc", "*dynOpts"]
 
     def __init__(self, host, pgPath, pgBuild, dbdir, malloc = "glibc", **opts):
         Task.__init__(self, host = host)
@@ -320,7 +320,7 @@ class PGVal(object):
         return (isinstance(other, PGVal) and
                 self.val == other.val and self.unit == other.unit)
 
-    def toConfigValue(self):
+    def toInfoValue(self):
         return (self.val, self.unit)
 
 class PGOptsProvider(object):

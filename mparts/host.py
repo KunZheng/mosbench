@@ -75,7 +75,7 @@ class Host(Task, SourceFileProvider):
     bandwidth links between certain hosts.  It also provides a wrapper
     for controlling sysctl's."""
 
-    __config__ = ["host"]
+    __info__ = ["host"]
 
     def __init__(self, host, cmdModifier = None):
         """Create a Host task that will connect to the given host name
@@ -136,7 +136,7 @@ class Host(Task, SourceFileProvider):
     def __str__(self):
         return self.host
 
-    def toConfigValue(self):
+    def toInfoValue(self):
         return str(self)
 
     def addRoute(self, target, hostname):
@@ -333,7 +333,7 @@ class HostInfo(Task):
     reflected in the task configuration and is copied into the results
     directory."""
 
-    __config__ = ["host", "uname", "kernel", "*sysctla", "*kconfig"]
+    __info__ = ["host", "uname", "kernel", "*sysctla", "*kconfig"]
 
     def __init__(self, host):
         Task.__init__(self, host = host)

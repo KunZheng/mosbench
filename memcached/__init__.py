@@ -14,11 +14,11 @@ DURATION = 15
 
 __all__.append("Memcached")
 class Memcached(Task):
-    __config__ = ["host", "mcPath", "mcBuild", "ports", "threadsPerCore", "mem"]
+    __info__ = ["host", "mcPath", "mcBuild", "ports", "threadsPerCore", "mem"]
 
     def __init__(self, host, mcPath, mcBuild, ports, threadsPerCore, mem):
         Task.__init__(self, host = host)
-        self.setConfigAttrs(Memcached, locals())
+        self.setInfoAttrs(Memcached, locals())
         self.__ps = []
 
     def start(self):
@@ -51,7 +51,7 @@ class MemcachedHost(object):
         self.host, self.dstPort, self.core, self.srcPort, self.threads = \
             host, dstPort, core, srcPort, threads
 
-    def toConfigValue(self):
+    def toInfoValue(self):
         return (self.host, self.dstPort, self.core, self.srcPort, self.threads)
 
     def getCommand(self, path, dstHost):
@@ -65,7 +65,7 @@ class MemcachedHost(object):
         return cmd
 
 class MemcachedLoad(Task, ResultsProvider, SourceFileProvider):
-    __config__ = ["mhosts", "counts", "drops", "*sysmonOut"]
+    __info__ = ["mhosts", "counts", "drops", "*sysmonOut"]
 
     def __init__(self, mhosts, memcached, sysmon):
         Task.__init__(self)

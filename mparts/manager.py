@@ -184,14 +184,14 @@ class Task(object):
     being raised during *any* part of a run (start, wait, or stop).
     Otherwise, runs are terminated using the stop() method.
 
-    == Configuration management ==
+    == Configuration/results recording ==
 
-    Each Task has a set of configuration values that are recorded
-    for each experiment.  See Task.getConfig.
+    Each Task has a set of fields that are recorded for each
+    experiment.  See Task.getInfo.
     """
 
     __slots__ = ["name", "classNames", "_state", "_manager", "_keys"]
-    __config__ = ["name", "classNames"]
+    __info__ = ["name", "classNames"]
 
     def __init__(self, **keys):
         """Initialize the task.  The keyword arguments specify the
@@ -199,7 +199,7 @@ class Task(object):
         will construct a default name from the class name and the
         keys."""
 
-        # classNames is used to look up objects in configuration dumps
+        # classNames is used to look up objects in info dumps
         self.classNames = [c.__name__ for c in type(self).__mro__]
         name = self.__class__.__name__
         for k, v in keys.iteritems():
@@ -213,69 +213,63 @@ class Task(object):
     def __str__(self):
         return self.name
 
-    def getConfig(self):
-        """Return the configuration dictionary for this task.  Each
-        task class may has a class field '__config__' which lists
-        names of fields.  The configuration dictionary will consist of
-        these field names and their values.  If any of the names start
-        with '*', then that field must contain a dictionary that will
-        be merged into the configuration.
+    def getInfo(self):
+        """Return the information dictionary for this task.  Each task
+        class may has a class field '__info__' which lists names of
+        fields.  The info dictionary will consist of these field names
+        and their values.  If any of the names start with '*', then
+        that field must contain a dictionary that will be merged into
+        the info dictionary.
 
         The returned dictionary will be cleaned so that it contains
         only regular Python types.  If any objects of user type are
-        found in the configuration, they must have a 'toConfigValue'
-        method that returns the object represented as some basic
-        Python type."""
-
-        # XXX __config__ really ought to be called __info__ or
-        # something, since it records tons of non-configuration and is
-        # easy to confuse with the configuration space, which really
-        # is configuration.
+        encountered, they must have a 'toInfoValue' method that returns
+        the object represented as some basic Python type."""
 
         names = set()
         for cls in reversed(type(self).__mro__):
-            if hasattr(cls, "__config__"):
-                names.update(cls.__config__)
-        config = {}
+            if hasattr(cls, "__info__"):
+                names.update(cls.__info__)
+        info = {}
         for name in names:
             if name.startswith("*"):
                 for k, v in getattr(self, name[1:]).iteritems():
-                    config[k] = self.__configify(v)
+                    info[k] = self.__primitize(v)
             else:
-                config[name] = self.__configify(getattr(self, name))
-        return config
+                info[name] = self.__primitize(getattr(self, name))
+        return info
 
-    def __configify(self, o):
-        """Convert o into a configuration-safe value, recursively."""
+    def __primitize(self, o):
+        """Convert o into a pickle-safe primitive value, recursively."""
 
         if o == None:
             return o
         if isinstance(o, (basestring, bool, float, int)):
             # Atomic types
             return o
-        c = self.__configify
+        c = self.__primitize
         if isinstance(o, dict):
             return dict((c(k), c(v)) for k, v in o.iteritems())
         if isinstance(o, list):
             return map(c, o)
         if isinstance(o, tuple):
             return tuple(map(c, o))
-        if hasattr(o, "toConfigValue"):
-            return c(o.toConfigValue())
+        if hasattr(o, "toInfoValue"):
+            return c(o.toInfoValue())
         # XXX We could just string anything else
-        raise ValueError("%r in %s is an invalid config type" %
+        raise ValueError("%r in %s is an invalid info type" %
                          (type(o), self.name))
 
     def log(self, msg):
         print "[%s] %s" % (self.name, msg)
 
-    def setConfigAttrs(self, cls, dct):
-        """For any variable in both cls.__config__ and dct, set that
+    def setInfoAttrs(self, cls, dct):
+        """For any variable in both cls.__info__ and dct, set that
         attribute in this object to the value in dct.  Passing in
-        'locals()' for dct is a quick way to set lots of configurable
+        'locals()' for dct is a quick way to set lots of info
         attributes in a class' constructor."""
 
-        for v in cls.__config__:
+        for v in cls.__info__:
             if v in dct:
                 setattr(self, v, dct[v])
 
@@ -307,17 +301,17 @@ class ResultPath(Task):
         return self.__path
 
     def stop(self, m):
-        """Dump the configuration of all entities into the result
+        """Dump the info dictionaries of all entities into the result
         directory and print the path of the result directory."""
 
         p = self.ensure()
 
-        # Gather configuration
-        config = []
+        # Gather info
+        info = []
         for o in m.tasks():
-            config.append(o.getConfig())
+            info.append(o.getInfo())
 
-        pickle.dump(config, file(os.path.join(p, "config"), "w"))
+        pickle.dump(info, file(os.path.join(p, "info"), "w"))
 
         prNotice(2, "Results in: " + p)
 

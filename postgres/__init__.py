@@ -19,15 +19,15 @@ DURATION = 15
 __all__.append("PostgresLoad")
 class PostgresLoad(Task, ResultsProvider, SourceFileProvider,
              postgres.PGOptsProvider):
-    __config__ = ["host", "trial", "clients", "rows", "partitions",
-                  "batchSize", "randomWritePct", "*sysmonOut"]
+    __info__ = ["host", "trial", "clients", "rows", "partitions",
+                "batchSize", "randomWritePct", "*sysmonOut"]
 
     def __init__(self, host, trial, pg, cores, clients, rows, partitions,
                  batchSize, randomWritePct, sysmon):
         Task.__init__(self, host = host, trial = trial)
         ResultsProvider.__init__(self, cores)
         # XXX Use this elsewhere
-        self.setConfigAttrs(PostgresLoad, locals())
+        self.setInfoAttrs(PostgresLoad, locals())
         self.pg = pg
         self.sysmon = sysmon
         self.__dbname = "pg%d-%d" % (self.rows, self.partitions)

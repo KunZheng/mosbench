@@ -1,7 +1,7 @@
 import os
 import cPickle as pickle
 
-__all__ = ["Experiment", "experiments", "series", "filterConfig", "the"]
+__all__ = ["Experiment", "experiments", "series", "filterInfo", "the"]
 
 # os.walk from Python 2.6, which adds support for followlinks.
 def walk(top, topdown=True, onerror=None, followlinks=False):
@@ -104,7 +104,7 @@ def naturalSort(l):
 class Experiment(object):
     def __init__(self, path):
         self.__path = path
-        self.__config = None
+        self.__info = None
 
     def __repr__(self):
         return "Experiment(%r)" % self.__path
@@ -114,11 +114,15 @@ class Experiment(object):
         return self.__path
 
     @property
-    def config(self):
-        if self.__config == None:
+    def info(self):
+        if self.__info == None:
+            # Old style
             p = os.path.join(self.__path, "config")
-            self.__config = pickle.load(file(p))
-        return self.__config
+            if not os.path.exists(p):
+                # New style
+                p = os.path.join(self.__path, "info")
+            self.__info = pickle.load(file(p))
+        return self.__info
 
     def openLog(self, cfgDict):
         return file(os.path.join(self.__path, "log", cfgDict["name"]))
@@ -129,7 +133,7 @@ def experiments(*dirs):
 
     for d in dirs:
         for (dirpath, dirnames, filenames) in walk(d, followlinks=True):
-            if "config" in filenames:
+            if "info" in filenames or "config" in filenames:
                 dirnames[:] = []
                 yield Experiment(dirpath)
             else:
@@ -147,7 +151,7 @@ def series(*dirs):
     order = []
     for top in dirs:
         for (dirpath, dirnames, filenames) in walk(top, followlinks=True):
-            if "config" in filenames:
+            if "info" in filenames or "config" in filenames:
                 dirnames[:] = []
                 # dirpath contains the data point and its parent
                 # contains the series
@@ -170,15 +174,15 @@ def series(*dirs):
     for sdir in order:
         yield sdir[len(common):].rstrip("/"), map(Experiment, pdirMap[sdir])
 
-def filterConfig(config, **selectors):
-    """Filter the configuration list, returning only the configuration
+def filterInfo(info, **selectors):
+    """Filter the information list, returning only the information
     dictionaries that match all of the items in selectors.  The
     'className' selector is treated specially to deal with subclassing
     relations."""
 
     className = selectors.pop("className", None)
 
-    for dct in config:
+    for dct in info:
         if className != None:
             if "classNames" in dct:
                 if className not in dct["classNames"]:

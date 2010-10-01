@@ -10,7 +10,7 @@ __all__ = []
 
 __all__.append("GmakeLoad")
 class GmakeLoad(Task, ResultsProvider, SourceFileProvider):
-    __config__ = ["host", "srcPath", "objPath", "*sysmonOut"]
+    __info__ = ["host", "srcPath", "objPath", "*sysmonOut"]
 
     def __init__(self, host, trial, cores, srcPath, objPath, sysmon):
         Task.__init__(self, host = host, trial = trial)

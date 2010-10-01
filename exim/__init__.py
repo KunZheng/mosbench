@@ -8,7 +8,7 @@ __all__ = []
 
 __all__.append("EximDaemon")
 class EximDaemon(Task):
-    __config__ = ["host", "eximPath", "eximBuild", "mailDir", "spoolDir", "port"]
+    __info__ = ["host", "eximPath", "eximBuild", "mailDir", "spoolDir", "port"]
 
     def __init__(self, host, eximPath, eximBuild, mailDir, spoolDir, port):
         Task.__init__(self, host = host)
@@ -48,7 +48,7 @@ class EximDaemon(Task):
 
 __all__.append("EximLoad")
 class EximLoad(Task, ResultsProvider):
-    __config__ = ["host", "trial", "eximPath", "clients", "port", "*sysmonOut"]
+    __info__ = ["host", "trial", "eximPath", "clients", "port", "*sysmonOut"]
 
     # XXX Control warmup/duration
     def __init__(self, host, trial, eximPath, cores, clients, port, sysmon):

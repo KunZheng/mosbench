@@ -63,7 +63,7 @@ def resultsTable(exps):
 
     for exp in exps:
         best = None
-        for rp in filterConfig(exp.config, className = "ResultsProvider"):
+        for rp in filterInfo(exp.info, className = "ResultsProvider"):
             infoTup = (os.path.relpath(exp.path), rp["classNames"][0])
             result = rp["result"]/rp["real"]/rp["cores"]
             resultTup = (rp["cores"], result, rp["units"] + "/sec/core",

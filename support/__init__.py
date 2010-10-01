@@ -15,7 +15,7 @@ class ResultsProvider(object):
     SystemMonitor, the analysis tools expect to find its logs results
     in the ResultsProvider subclass."""
 
-    __config__ = ["cores", "result", "unit", "units", "real"]
+    __info__ = ["cores", "result", "unit", "units", "real"]
 
     def __init__(self, cores):
         self.cores = cores
@@ -36,7 +36,7 @@ class ResultsProvider(object):
 
 __all__.append("IXGBE")
 class IXGBE(Task, SourceFileProvider):
-    __config__ = ["host", "iface", "queues"]
+    __info__ = ["host", "iface", "queues"]
 
     def __init__(self, host, iface, queues):
         Task.__init__(self, host = host, iface = iface)
@@ -54,8 +54,12 @@ class IXGBE(Task, SourceFileProvider):
             if modname.startswith("ixgbe"):
                 self.log("rmmod %s" % modname)
                 self.host.sudo.run(["rmmod", modname])
-        self.log("modprobe ixgbe-pin")
-        self.host.sudo.run(["modprobe", "ixgbe-pin"])
+        self.log("modprobe ixgbe")
+        self.host.sudo.run(["modprobe", "ixgbe"])
+#        self.log("modprobe ixgbe-pin")
+#        self.host.sudo.run(["modprobe", "ixgbe-pin"])
+#        self.log("modprobe ixgbe-memcached")
+#        self.host.sudo.run(["modprobe", "ixgbe-memcached"])
 
         self.log("Setting %s queue affinity to %s" % (self.iface, self.queues))
         self.host.sudo.run([self.__script, self.iface, self.queues],
@@ -73,7 +77,7 @@ CPU_CACHE = {}
 
 __all__.append("SetCPUs")
 class SetCPUs(Task, SourceFileProvider):
-    __config__ = ["host", "num", "hotplug", "seq"]
+    __info__ = ["host", "num", "hotplug", "seq"]
 
     def __init__(self, host, num, hotplug = True, seq = "seq"):
         Task.__init__(self, host = host)
@@ -155,7 +159,7 @@ PREFETCH_CACHE = set()
 
 __all__.append("PrefetchList")
 class PrefetchList(Task, SourceFileProvider):
-    __config__ = ["host", "filesPath"]
+    __info__ = ["host", "filesPath"]
 
     def __init__(self, host, filesPath, reuse = False):
         Task.__init__(self, host = host, filesPath = filesPath)
@@ -178,7 +182,7 @@ class PrefetchList(Task, SourceFileProvider):
 
 __all__.append("PrefetchDir")
 class PrefetchDir(Task, SourceFileProvider):
-    __config__ = ["host", "topDir", "excludes"]
+    __info__ = ["host", "topDir", "excludes"]
 
     def __init__(self, host, topDir, excludes = []):
         Task.__init__(self, host = host, topDir = topDir)
@@ -196,7 +200,7 @@ class PrefetchDir(Task, SourceFileProvider):
 
 __all__.append("FileSystem")
 class FileSystem(Task, SourceFileProvider):
-    __config__ = ["host", "fstype"]
+    __info__ = ["host", "fstype"]
 
     def __init__(self, host, fstype, clean = True):
         Task.__init__(self, host = host, fstype = fstype)
@@ -245,7 +249,7 @@ def waitForLog(host, logPath, name, secs, string):
 # source file, but doesn't have any life-cycle.
 __all__.append("SystemMonitor")
 class SystemMonitor(Task, SourceFileProvider):
-    __config__ = ["host"]
+    __info__ = ["host"]
 
     def __init__(self, host):
         Task.__init__(self, host = host)
