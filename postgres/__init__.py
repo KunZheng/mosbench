@@ -11,6 +11,8 @@ import os, time, signal, re, math
 
 __all__ = []
 
+# XXX This warmup sometimes isn't enough.  Watch the log for when it's
+# ready, then warmup.
 WARMUP = 5
 DURATION = 15
 
