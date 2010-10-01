@@ -22,7 +22,13 @@ case $1 in
         fi
         ;;
     hugetlb)
-        rm -f $BASE/$1/pagefile*
+        for f in $BASE/$1/pagefile*; do
+            # hugetlbfs WON'T FREE the huge pages backing these files
+            # if we simply delete them.  We have to first truncate
+            # them, which will free the pages.
+            truncate --size=0 $f
+            rm $f
+        done
         ;;
     *)
         echo "Unknown file system type $1" &>2
