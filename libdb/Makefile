@@ -1,9 +1,11 @@
-BASE47=db-4.7.25.NC
-INSTALL47=$(shell pwd)/db4.7-mod
+BASE47 := db-4.7.25.NC
+DB47_DIR := $(shell pwd)/$(BASE47)
+MY_DIR := $(shell pwd)
 
 all: db4.7-mod
 
-clean: clean4.7
+clean:
+	rm -rf build db4.7-mod
 
 
 .PHONY: unpack4.7
@@ -22,24 +24,15 @@ $(BASE47)/.stamp-patch: | $(BASE47)
 	patch -p1 -d$(BASE47) < patch.4.7.25.mosbench
 	touch $@
 
-.PHONY: configure4.7
-configure4.7: $(BASE47)/.stamp-configure
-
-# (dist/configure replaces the -O CFLAG with what it really wants)
-$(BASE47)/.stamp-configure: $(BASE47)/.stamp-patch
-	cd $(BASE47)/build_unix && \
-	  CFLAGS="-O -DMOSBENCH_CACHE_NPROC -DMOSBENCH_FORCE_MULTICORE" \
-	  ../dist/configure --prefix=$(INSTALL47)
-	touch $@
-
-.PHONY: build4.7
-build4.7: $(BASE47)/.stamp-configure
-	$(MAKE) -C $(BASE47)/build_unix
+.PHONY: setup4.7
+setup4.7: $(BASE47)/.stamp-patch
+	if [ ! -e build/db4.7-mod/Makefile ]; then \
+		mkdir -p build/db4.7-mod && \
+		cd build/db4.7-mod && \
+		$(DB47_DIR)/dist/configure --prefix=$(MY_DIR)/db4.7-mod; \
+	fi
 
 .PHONY: db4.7-mod
-db4.7-mod: build4.7
-	$(MAKE) -C $(BASE47)/build_unix install
-
-.PHONY: clean4.7
-clean4.7:
-	$(MAKE) -C $(BASE47)/build_unix clean
+db4.7-mod: setup4.7
+	$(MAKE) -C build/db4.7-mod
+	$(MAKE) -C build/db4.7-mod install
