@@ -1,6 +1,6 @@
 from mparts.configspace import ConfigSpace
 
-import clients
+import hosts
 
 # If set to True, do as few experiments as quickly as possible to test
 # the setup.  This is useful to do before the full benchmark suite
@@ -42,9 +42,9 @@ shared = ConfigSpace.unit()
 # ssh automatically).
 #
 # XXX This is somewhat out of date.  Perhaps it should go in
-# clients.py.
+# hosts.py.
 
-shared *= mk(primaryHost = clients.primaryHost)
+shared *= mk(primaryHost = hosts.primaryHost)
 # Careful, mk treats a list as a set of alternate configurations, so
 # you probably want to pass a list with a single element that is a
 # list of secondary hosts.
@@ -126,7 +126,7 @@ import memcached
 
 memcached = mk(benchmark = memcached.runner, nonConst = True)
 
-memcached *= mk(getLoadHosts = clients.getMemcacheClients)
+memcached *= mk(getLoadHosts = hosts.getMemcacheClients)
 
 ##################################################################
 # Postgres
@@ -174,7 +174,7 @@ postgres = mk(benchmark = postgres.runner, nonConst = True)
 #
 # This host must have the Postgres client library installed (libpq-dev
 # on Debian/Ubuntu).
-postgres *= mk(secondaryHost = clients.postgresClient)
+postgres *= mk(secondaryHost = hosts.postgresClient)
 
 postgres *= mk(rows = 10000000)
 postgres *= mk(partitions = 0)
