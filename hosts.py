@@ -1,3 +1,23 @@
+# MOSBENCH involves three types of hosts:
+# 1. The single primary host runs the benchmark applications.  It
+#    should be a large multicore machine.  For the Apache and
+#    Memcached benchmarks, it should have a very fast network
+#    connection to the load generators.
+# 2. A set of client machines act as load generators for the
+#    memcached, Apache, and Postgres benchmarks.  This list should
+#    *not* include the primary host.
+# 3. The driver host runs the driver script, which coordinates the
+#    benchmark programs and load generators on the primary and
+#    secondary hosts and gather results.  The benchmark was designed
+#    so that this can be a different host from the primary host;
+#    however, this is NOT a well-tested configuration.  This host must
+#    have ssh keys set up for passwordless access to all hosts except
+#    the one it is running on.
+# Here we configure these hosts.  All of the host names provided here
+# must work from all of the hosts.  Don't use "localhost".  The driver
+# will detect if it is running on one of these hosts and forgo ssh
+# automatically).
+
 __all__ = ["primaryHost", "postgresClient", "getMemcacheClients"]
 
 from mparts.host import Host

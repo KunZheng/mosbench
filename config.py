@@ -22,28 +22,7 @@ mk = ConfigSpace.mk
 
 shared = ConfigSpace.unit()
 
-# MOSBENCH involves three types of hosts:
-# 1. The single primary host runs the benchmark applications.  It
-#    should be a large multicore machine.  For the Apache and
-#    Memcached benchmarks, it should have a very fast network
-#    connection to the load generators.
-# 2. A set of secondary hosts act as load generators for the
-#    memcached, Apache, and Postgres benchmarks.  This list should
-#    *not* include the primary host.
-# 3. The driver host runs the driver script, which coordinates the
-#    benchmark programs and load generators on the primary and
-#    secondary hosts and gather results.  It can be run from a primary
-#    or secondary host, though doing so may perturb the results.  This
-#    host must have ssh keys set up for passwordless access to all
-#    hosts except the one it is running on.
-# Here we configure these hosts.  All of the host names provided here
-# must work from all of the hosts.  Don't use "localhost" (though the
-# driver will detect if it is running on one of these hosts and forgo
-# ssh automatically).
-#
-# XXX This is somewhat out of date.  Perhaps it should go in
-# hosts.py.
-
+# The primary host that will run the benchmark applications.
 shared *= mk(primaryHost = hosts.primaryHost)
 
 # benchRoot specifies the directory on the primary host where MOSBENCH
