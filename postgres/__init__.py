@@ -144,7 +144,7 @@ class PostgresRunner(object):
     @staticmethod
     def run(m, cfg):
         host = cfg.primaryHost
-        loadgen = cfg.secondaryHost
+        loadgen = cfg.postgresClient
 
         m += host
         m += loadgen

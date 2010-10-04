@@ -43,7 +43,9 @@ primaryHost = tom
 # Postgres uses a single client load generator, which should be a
 # reasonably beefy machine (we use a 16 core machine, though come
 # nowhere near its capacity).  The ratio of client work to server work
-# for Postgres is nowhere near that of Apache or memcached.
+# for Postgres is nowhere near that of Apache or memcached.  This host
+# must have the Postgres client library installed (libpq-dev on
+# Debian/Ubuntu).
 postgresClient = clients["josmp"]
 
 # Memcached uses a large set of clients, very carefully chosen to

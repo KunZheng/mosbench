@@ -45,11 +45,6 @@ shared = ConfigSpace.unit()
 # hosts.py.
 
 shared *= mk(primaryHost = hosts.primaryHost)
-# Careful, mk treats a list as a set of alternate configurations, so
-# you probably want to pass a list with a single element that is a
-# list of secondary hosts.
-# XXX
-#shared *= mk(secondaryHosts = [[josmp]])
 
 # benchRoot specifies the directory on the primary host where MOSBENCH
 # was checked out or unpacked.
@@ -79,13 +74,6 @@ if sanityRun:
 else:
     shared *= mk(trials = 3)
 
-# monitors specifies the set of monitoring tasks to run during each
-# benchmark.  This can be overridden for individual benchmarks (though
-# this will replace the list, not add to it).  See the note for
-# secondaryHosts about lists.
-# XXX
-#shared *= mk(monitors = [[]])
-
 # hotplug specifies whether or not to use CPU hotplug to physically
 # disable cores not in use by the benchmark.  All cores should be
 # re-enabled when the benchmark exits, even after an error.  Enabling
@@ -109,6 +97,13 @@ else:
 ##################################################################
 # Exim
 #
+# eximBuild - The build name of Exim to run.  Corresponds to a
+# subdirectory of the exim/ directory that contains an Exim
+# installation.
+#
+# eximPort - The port Exim should listen on.
+#
+# clients - The number of client load generators to run.
 
 import exim
 
@@ -121,6 +116,9 @@ exim *= mk(clients = 96)
 ##################################################################
 # memcached
 #
+# getLoadHosts - A function that takes a destination host and a list
+# of ports and returns a list of memcached.MemcachedHost objects to
+# use as client load generators.
 
 import memcached
 
@@ -170,11 +168,7 @@ import postgres
 
 postgres = mk(benchmark = postgres.runner, nonConst = True)
 
-# XXX Put in global config?
-#
-# This host must have the Postgres client library installed (libpq-dev
-# on Debian/Ubuntu).
-postgres *= mk(secondaryHost = hosts.postgresClient)
+postgres *= mk(postgresClient = hosts.postgresClient)
 
 postgres *= mk(rows = 10000000)
 postgres *= mk(partitions = 0)
@@ -233,6 +227,14 @@ psearchy *= mk(dblim = 200000)
 ##################################################################
 # Metis
 #
+# streamflow - Whether or not to use the Streamflow parallel
+# allocator.
+#
+# model - The memory allocation model to use.  Either "default" to use
+# 4K pages or "hugetlb" to 2M pages.  "hugetlb" requires the
+# Streamflow allocator.
+#
+# order - The sequence to assign cores in.  "seq" or "rr".
 
 import metis
 
@@ -256,15 +258,15 @@ metis *= mk(order = ["rr"])
 # one configuration.  Furthermore, instead of computing the regular
 # product, we compute a "merge" product, where assignments from the
 # left will override assignments to the same variables from the right.
-#configSpace = (exim + postgres + gmake + psearchy + metis).merge(shared)
-#configSpace = (postgres + gmake + psearchy + metis).merge(shared)
-configSpace = memcached.merge(shared)
+
+configSpace = ((exim + memcached + postgres + gmake + psearchy + metis)
+               .merge(shared))
+#configSpace = memcached.merge(shared)
 #configSpace = exim.merge(shared)
 #configSpace = postgres.merge(shared)
 #configSpace = gmake.merge(shared)
 #configSpace = psearchy.merge(shared)
 #configSpace = metis.merge(shared)
-#configSpace = (metis + exim).merge(shared)
 
 ##################################################################
 # Run
