@@ -250,7 +250,7 @@ class Postgres(Task):
                 if "FATAL" in log:
                     break
             else:
-                raise ValueError("Timeout waiting for postgres to start")
+                raise RuntimeError("Timeout waiting for postgres to start")
             if done:
                 break
 
