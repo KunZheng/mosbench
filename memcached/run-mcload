@@ -10,6 +10,11 @@ set -e
 # monitoring period, even if they're not all monitoring the exact same
 # period.
 
+if [ $# != 3 ]; then
+    echo "Usage: $0 starttime synctime duration" >&2
+    exit 2
+fi
+
 STARTTIME=$1
 SYNCTIME=$2
 DURATION=$3
