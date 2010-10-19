@@ -96,7 +96,6 @@ class MemcachedLoad(Task, ResultsProvider, SourceFileProvider):
         asyncs = []
         logs = []
         for n, cmd in enumerate(cmds):
-            self.log("Starting %d" % n)
             host = self.mhosts[n].host
             logPath = host.getLogPath(self) + "-%s.%d" % (host, n)
             cmd = [self.__runners[host], str(STARTTIME), str(SYNCTIME),
@@ -104,11 +103,9 @@ class MemcachedLoad(Task, ResultsProvider, SourceFileProvider):
             asyncs.append(Async(host.r.run, cmd, stdout = logPath,
                                 wait = False))
             logs.append((host, logPath))
-        self.log("Syncing")
         ls = map(Async.sync, asyncs)
 
         # Wait for everything to start and enter its measurement period
-        self.log("Sleeping for start")
         time.sleep(STARTTIME + SYNCTIME)
 
         # Start monitoring.  (XXX Do we need to time trigger this, too?)
@@ -116,7 +113,7 @@ class MemcachedLoad(Task, ResultsProvider, SourceFileProvider):
         self.sysmon.startMonitor()
 
         # Wait for run duration
-        self.log("Waiting")
+        self.log("Monitoring")
         time.sleep(DURATION)
 
         # Stop monitoring
@@ -124,7 +121,6 @@ class MemcachedLoad(Task, ResultsProvider, SourceFileProvider):
         self.sysmonOut = self.sysmon.stopMonitor()
 
         # Cleanup processes
-        self.log("Cleaning up")
         for l in ls:
             l.wait()
 
