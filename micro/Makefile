@@ -1,20 +1,27 @@
+# Location of the qemu mtrace header files
+QEMUDIR = /home/sbw/qemu
+
 # Quiet compile, unset for verbose output
 Q	= @
-O	= o
 
+O	= o
 CC	= gcc
+
+ifneq ($(QEMUDIR),)
+MTRACE  = -D_MTRACE -I$(QEMUDIR)
+endif
 
 CWARNS	= -Wformat=2 -Wextra -Wmissing-noreturn -Wwrite-strings -Wshadow \
 	  -Wno-unused-parameter -Wmissing-format-attribute -fno-builtin \
 	  -Wswitch-default -Wmissing-prototypes \
 	  -Wmissing-declarations
 CFLAGS  = $(DEFS) -Wall -Werror -fno-strict-aliasing $(CWARNS) \
-	  -g -O3 -D_GNU_SOURCE -m64
+	  -g -O3 -D_GNU_SOURCE -m64 $(MTRACE)
 
 LIBS	= bench.c
-DEPS	= bench.h $(LIBS) 
+DEPS	= bench.h mtrace.h $(LIBS) 
 
-BINS	= memclone
+BINS	= memclone fops-dir
 BINS	:= $(addprefix $(O)/, $(BINS))
 
 all: $(BINS)

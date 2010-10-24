@@ -1,3 +1,7 @@
+/*
+ * Create threads, touch memory, and cause the kernel to demand allocate pages.
+ */
+
 #include <sys/mman.h>
 #include <stdio.h>
 #include <pthread.h>
