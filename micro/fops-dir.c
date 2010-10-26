@@ -2,6 +2,8 @@
  * Operate (XOP) on per-process files in the same directory.
  */
 
+#define TESTNAME "fops_dir"
+
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -69,7 +71,7 @@ static void sighandler(int x)
 	uint64_t stop, tot;
 	unsigned int i;
 
-	mtrace_enable_set(0);
+	mtrace_enable_set(0, TESTNAME, sizeof(TESTNAME));
 
 	for (i = 0; i < NPMC; i++)
 		pmc_stop[i] = read_pmc(i);
@@ -114,7 +116,7 @@ static void test(unsigned int proc)
 		for (i = 0; i < NPMC; i++)
 			pmc_start[i] = read_pmc(i);
 
-		mtrace_enable_set(1);
+		mtrace_enable_set(1, TESTNAME, sizeof(TESTNAME));
 		shared->run = 1;
 	} else {
 		while (shared->run == 0)

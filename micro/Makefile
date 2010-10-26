@@ -8,7 +8,8 @@ O	= o
 CC	= gcc
 
 ifneq ($(QEMUDIR),)
-MTRACE  = -D_MTRACE -I$(QEMUDIR)
+MTRACE	  = -D_MTRACE -I$(QEMUDIR)
+MTRACEDEP = $(QEMUDIR)/mtrace-magic.h
 endif
 
 CWARNS	= -Wformat=2 -Wextra -Wmissing-noreturn -Wwrite-strings -Wshadow \
@@ -19,7 +20,7 @@ CFLAGS  = $(DEFS) -Wall -Werror -fno-strict-aliasing $(CWARNS) \
 	  -g -O3 -D_GNU_SOURCE -m64 $(MTRACE)
 
 LIBS	= bench.c
-DEPS	= bench.h mtrace.h $(LIBS) 
+DEPS	= bench.h mtrace.h config.h $(LIBS) $(MTRACEDEP)
 
 BINS	= memclone fops-dir
 BINS	:= $(addprefix $(O)/, $(BINS))
