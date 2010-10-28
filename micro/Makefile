@@ -22,7 +22,7 @@ CFLAGS  = $(DEFS) -Wall -Werror -fno-strict-aliasing $(CWARNS) \
 LIBS	= bench.c
 DEPS	= bench.h mtrace.h config.h $(LIBS) $(MTRACEDEP)
 
-BINS	= memclone fops-dir
+BINS	= memclone fops-dir proc-ping-pong
 BINS	:= $(addprefix $(O)/, $(BINS))
 
 all: $(BINS)
