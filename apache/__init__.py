@@ -190,7 +190,7 @@ class ApacheRunner(object):
     @staticmethod
     def run(m, cfg):
         host = cfg.primaryHost
-        loadHosts = cfg.getApacheClients(cfg.cores)
+        loadHosts = cfg.getApacheClients(cfg)
 
         m += host
         m += HostInfo(host)

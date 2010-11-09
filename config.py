@@ -136,8 +136,8 @@ memcached *= mk(getLoadHosts = clients.getMemcacheClients)
 #
 # fileSize - The size of the file to serve, in bytes.
 #
-# getApacheClients - A function that, given the number of cores,
-# returns a list of Host objects that should be used for client load
+# getApacheClients - A function that, given the configuration, returns
+# a list of Host objects that should be used for client load
 # generators.  The same host may be returned multiple times.
 #
 # getApacheRate - A function that, given the configuration, returns
@@ -154,7 +154,6 @@ apache = mk(benchmark = apache.runner, nonConst = True)
 
 apache *= mk(threadsPerCore = 24)
 apache *= mk(fileSize = 300)
-# XXX Pass cfg
 apache *= mk(getApacheClients = clients.getApacheClients)
 apache *= mk(getApacheRate = lambda cfg: 100 + 400*cfg.cores)
 apache *= mk(getApacheFDLim = lambda cfg: max(41 * cfg.cores / 20, 10))

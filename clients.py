@@ -139,7 +139,7 @@ apacheList = [
 "hooverdam",
 "hooverdam"]
 
-def getApacheClients(cores):
+def getApacheClients(cfg):
     lst = []
     # XXX
     cores = len(apacheList)
