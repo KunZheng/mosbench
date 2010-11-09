@@ -148,7 +148,7 @@ class MemcachedRunner(object):
     def run(m, cfg):
         ports = range(BASE_PORT, BASE_PORT + cfg.cores)
         host = cfg.primaryHost
-        loadHosts = cfg.getLoadHosts(host, ports)
+        loadHosts = cfg.getMemcacheClients(host, ports)
 
         m += host
         m += HostInfo(host)

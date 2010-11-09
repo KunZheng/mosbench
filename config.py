@@ -95,16 +95,15 @@ exim *= mk(clients = 96)
 ##################################################################
 # memcached
 #
-# getLoadHosts - A function that takes a destination host and a list
-# of ports and returns a list of memcached.MemcachedHost objects to
-# use as client load generators.
+# getMemcacheClients - A function that takes a destination host and a
+# list of ports and returns a list of memcached.MemcachedHost objects
+# to use as client load generators.
 
 import memcached
 
 memcached = mk(benchmark = memcached.runner, nonConst = True)
 
-# XXX Rename getMemcacheClients
-memcached *= mk(getLoadHosts = hosts.getMemcacheClients)
+memcached *= mk(getMemcacheClients = hosts.getMemcacheClients)
 
 ##################################################################
 # Apache
