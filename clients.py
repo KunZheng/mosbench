@@ -1,4 +1,5 @@
-__all__ = ["primaryHost", "postgresClient", "getMemcacheClients"]
+__all__ = ["primaryHost", "postgresClient", "getMemcacheClients",
+           "getApacheClients"]
 
 from mparts.host import Host
 from support import perfLocked
@@ -22,7 +23,9 @@ clientHosts = ["josmp.csail.mit.edu",
                "brick-11.lcs.mit.edu", "brick-12.lcs.mit.edu",
                "brick-14.lcs.mit.edu",
                "hooverdam.lcs.mit.edu",
-               "ud0.csail.mit.edu"]
+               "ud0.csail.mit.edu",
+               "ud1.csail.mit.edu",
+               "hydra.lcs.mit.edu"]
 clients = dict((hostname.split(".",1)[0], Host(hostname))
                for hostname in clientHosts)
 
@@ -74,4 +77,72 @@ def getMemcacheClients(dstHost, ports):
     for port, client in zip(ports, clientsRep):
         lst.append(MemcachedHost(client, port, threads = 15))
 
+    return lst
+
+apacheList = [
+"josmp",
+"josmp",
+"josmp",
+"josmp",
+"josmp",
+"josmp",
+"josmp",
+"josmp",
+"josmp",
+"josmp",
+"josmp",
+"josmp",
+"josmp",
+"josmp",
+"josmp",
+"josmp",
+"brick-1",
+"brick-2",
+"brick-3",
+"brick-4",
+"brick-5",
+"brick-5",
+"brick-6",
+"brick-7",
+"brick-7",
+"brick-8",
+"brick-8",
+"brick-9",
+"brick-9",
+"brick-10",
+"brick-10",
+"brick-11",
+"brick-11",
+"brick-12",
+"brick-12",
+"brick-14",
+"brick-14",
+"oc-5",
+"oc-6",
+"oc-7",
+"oc-8",
+"oc-9",
+"oc-10",
+"oc-11",
+"ud0",
+"ud0",
+"ud0",
+"ud0",
+"hydra",
+"hydra",
+"hydra",
+"hydra",
+"ud1",
+"ud1",
+"ud1",
+"ud1",
+"hooverdam",
+"hooverdam"]
+
+def getApacheClients(cores):
+    lst = []
+    # XXX
+    cores = len(apacheList)
+    for n in range(cores):
+        lst.append(clients[apacheList[n]])
     return lst
