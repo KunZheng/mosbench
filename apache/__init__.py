@@ -200,7 +200,6 @@ class ApacheRunner(object):
         if cfg.hotplug:
             m += SetCPUs(host = host, num = cfg.cores)
         # XXX Make configurable (at least iface name)
-        # XXX Load ixgbe-apache module
         m += IXGBE(host, "eth0", queues = "n%min(NCPU, NRX if rx else NTX)",
                    flowDirector = "spread-incoming")
 
