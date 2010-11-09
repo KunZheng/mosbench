@@ -1,0 +1,43 @@
+#!/usr/bin/python
+
+import sys, urllib2, re, time
+
+if len(sys.argv) != 4:
+    print >> sys.stderr, "Usage: %s warmup duration port" % sys.argv[0]
+    sys.exit(2)
+
+WARMUP, DURATION, PORT = map(int, sys.argv[1:])
+
+def getRequests():
+    url = "http://127.0.0.1:%d/server-status?auto" % PORT
+    print "Fetching %s..." % url
+    for retry in range(10):
+        try:
+            data = urllib2.urlopen(url, timeout=2).read()
+        except urllib2.URLError, e:
+            if retry == 9:
+                raise
+            print "Failed %s, retrying" % e
+        else:
+            break
+    print data
+    ms = re.findall(r"(?m)^Total Accesses: *([0-9]+)$", data)
+    assert len(ms) == 1, "Failed to parse total accesses"
+    return int(ms[0])
+
+# Warm up
+time.sleep(WARMUP)
+
+# Measure
+start, stime = getRequests(), time.time()
+print "Starting"
+sys.stdout.flush()
+time.sleep(DURATION)
+end, etime = getRequests(), time.time()
+print "Stopped"
+sys.stdout.flush()
+
+# Results
+reqs = end - start
+dur = etime - stime
+print "%d requests, %f seconds, %d per second" % (reqs, dur, reqs / dur)
