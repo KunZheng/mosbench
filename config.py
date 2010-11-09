@@ -132,14 +132,32 @@ memcached *= mk(getLoadHosts = clients.getMemcacheClients)
 ##################################################################
 # Apache
 #
+# threadsPerCore - The number of Apache threads to run per core.
+#
+# fileSize - The size of the file to serve, in bytes.
+#
+# getApacheClients - A function that, given the number of cores,
+# returns a list of Host objects that should be used for client load
+# generators.  The same host may be returned multiple times.
+#
+# getApacheRate - A function that, given the configuration, returns
+# the number of connections that each load generator client should
+# attempt per second.
+#
+# getApacheFDLim - A function that, given the configuration, returns
+# the FD limit for each load generator client.  This, in turn, limits
+# the number of open connections each client can maintain at once.
 
 import apache
 
 apache = mk(benchmark = apache.runner, nonConst = True)
 
 apache *= mk(threadsPerCore = 24)
+apache *= mk(fileSize = 300)
+# XXX Pass cfg
 apache *= mk(getApacheClients = clients.getApacheClients)
 apache *= mk(getApacheRate = lambda cfg: 100 + 400*cfg.cores)
+apache *= mk(getApacheFDLim = lambda cfg: max(41 * cfg.cores / 20, 10))
 
 ##################################################################
 # Postgres

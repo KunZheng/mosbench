@@ -10,7 +10,6 @@ __all__ = []
 WARMUP = 5
 DURATION = 15
 PORT = 8000
-BYTES = 300
 
 extraConf = """
 <Directory />
@@ -208,8 +207,7 @@ class ApacheRunner(object):
         # we bind it to specific cores.
         apachePath = os.path.join(cfg.benchRoot, "apache")
         total = cfg.cores * cfg.threadsPerCore
-        # XXX BYTES
-        apache = Apache(host, apachePath, "apache-mod", PORT, BYTES,
+        apache = Apache(host, apachePath, "apache-mod", PORT, cfg.fileSize,
                         ListenBacklog = 512,
                         KeepAlive = False,
                         ServerLimit = cfg.cores,
@@ -224,8 +222,7 @@ class ApacheRunner(object):
         m += apache
 
         m += Httperf(loadHosts, cfg.getApacheRate(cfg), apache,
-                     # XXX Make configurable
-                     max(41 * cfg.cores / 20, 10))
+                     cfg.getApacheFDLim(cfg))
 
         sysmon = SystemMonitor(host)
         m += sysmon
