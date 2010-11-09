@@ -1324,6 +1324,11 @@ static int make_child(server_rec *s, int slot)
     }
 
     if (!pid) {
+#ifdef MOSBENCH_PIN
+        int num_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+        int cpu = slot % num_cpus;
+        cpu_set_t mask;
+#endif
 #ifdef HAVE_BINDPROCESSOR
         /* By default, AIX binds to a single processor.  This bit unbinds
          * children which will then bind to another CPU.
@@ -1338,6 +1343,19 @@ static int make_child(server_rec *s, int slot)
         RAISE_SIGSTOP(MAKE_CHILD);
 
         apr_signal(SIGTERM, just_die);
+#ifdef MOSBENCH_PIN
+        CPU_ZERO(&mask);
+        CPU_SET(cpu, &mask);
+
+        ap_log_error(APLOG_MARK, APLOG_WARNING, 0, ap_server_conf,
+                     "sched_setaffinity slot %d to cpu %d", slot, cpu);
+
+        if (sched_setaffinity(0, sizeof(mask), &mask) < 0) {
+            ap_log_error(APLOG_MARK, APLOG_EMERG, errno, ap_server_conf,
+                         "sched_setaffinity failed");
+            clean_child_exit(APEXIT_CHILDFATAL);
+        }
+#endif
         child_main(slot);
 
         clean_child_exit(0);

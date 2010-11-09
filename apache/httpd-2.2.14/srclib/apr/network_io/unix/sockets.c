@@ -184,6 +184,13 @@ apr_status_t apr_socket_bind(apr_socket_t *sock, apr_sockaddr_t *sa)
 
 apr_status_t apr_socket_listen(apr_socket_t *sock, apr_int32_t backlog)
 {
+#ifdef MOSBENCH_MULTI_ACCEPT
+#define TCP_MULTI_ACCEPT 18
+    int yes = 1;
+    if (setsockopt(sock->socketdes, SOL_TCP, TCP_MULTI_ACCEPT, &yes, sizeof(int)) == -1)
+        return errno;
+#endif
+
     if (listen(sock->socketdes, backlog) == -1)
         return errno;
     else
