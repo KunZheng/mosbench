@@ -274,12 +274,13 @@ class RemoteHost(object):
 
             try:
                 info["cmdline"] = file(os.path.join("/proc", pid, "cmdline")).read().split("\0")
+                info["exe"] = os.readlink(os.path.join("/proc", pid, "exe"))
                 info["status"] = {}
                 for l in file(os.path.join("/proc", pid, "status")):
                     k, v = l.split(":", 1)
                     info["status"][k] = v.strip()
             except EnvironmentError, e:
-                if e.errno == errno.ENOENT:
+                if e.errno == errno.ENOENT or e.errno == errno.EACCES:
                     continue
                 raise
             procs[int(pid)] = info
