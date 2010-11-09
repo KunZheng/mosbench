@@ -30,16 +30,16 @@ shared *= mk(primaryHost = hosts.primaryHost)
 shared *= mk(benchRoot = "~/mosbench")
 
 # textRoot specifies the directory on the primary host where the text
-# to use for the Psearchy indexing benchmark can be found.  (XXX other
-# benchmarks?)  To reproduce the results in the paper, this should be
-# a pristine check out of Linux 2.6.35-rc5 (XXX correct?).
+# to use for the Psearchy indexing benchmark can be found.  To
+# reproduce the results in the paper, this should be a pristine check
+# out of Linux 2.6.35-rc5.
 shared *= mk(textRoot = "~/scale-linux")
 
 # kernelRoot specifies the directory on the primary host where the
 # kernel source to use for the gmake benchmark can be found.  To
 # reproduce the results in the paper, this should be a check out of
-# Linux 2.6.35-rc5 (XXX correct?).  This can be the same directory
-# used for textRoot above.
+# Linux 2.6.35-rc5.  This can be the same directory used for textRoot
+# above.
 shared *= mk(kernelRoot = "~/scale-linux")
 
 # fs specifies which type of file system to use.  This can be any file
@@ -55,13 +55,9 @@ else:
 
 # hotplug specifies whether or not to use CPU hotplug to physically
 # disable cores not in use by the benchmark.  All cores should be
-# re-enabled when the benchmark exits, even after an error.  Enabling
-# this requires granting the benchmark user on the primary host sudo
-# access.  Note that the Exim benchmark REQUIRES hotplug to be
-# enabled, so either enable this or disable the Exim benchmark.
-#
-# XXX gmake requires, too?  In principle we could use numactl, but
-# that probably isn't worth the effort.
+# re-enabled when the benchmark exits, even after an error.  Several
+# of the benchmarks do not otherwise restrict which cores they use,
+# and thus will give bogus results without this.
 shared *= mk(hotplug = True)
 
 # cores specifies the number of cores to use.  This must be
