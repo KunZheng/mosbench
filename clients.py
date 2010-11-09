@@ -79,70 +79,27 @@ def getMemcacheClients(dstHost, ports):
 
     return lst
 
-apacheList = [
-"josmp",
-"josmp",
-"josmp",
-"josmp",
-"josmp",
-"josmp",
-"josmp",
-"josmp",
-"josmp",
-"josmp",
-"josmp",
-"josmp",
-"josmp",
-"josmp",
-"josmp",
-"josmp",
-"brick-1",
-"brick-2",
-"brick-3",
-"brick-4",
-"brick-5",
-"brick-5",
-"brick-6",
-"brick-7",
-"brick-7",
-"brick-8",
-"brick-8",
-"brick-9",
-"brick-9",
-"brick-10",
-"brick-10",
-"brick-11",
-"brick-11",
-"brick-12",
-"brick-12",
-"brick-14",
-"brick-14",
-"oc-5",
-"oc-6",
-"oc-7",
-"oc-8",
-"oc-9",
-"oc-10",
-"oc-11",
-"ud0",
-"ud0",
-"ud0",
-"ud0",
-"hydra",
-"hydra",
-"hydra",
-"hydra",
-"ud1",
-"ud1",
-"ud1",
-"ud1",
-"hooverdam",
-"hooverdam"]
+apacheList = ["josmp", "josmp", "josmp", "josmp",
+              "josmp", "josmp", "josmp", "josmp",
+              "josmp", "josmp", "josmp", "josmp",
+              "josmp", "josmp", "josmp", "josmp",
+
+              "brick-1", "brick-2", "brick-3", "brick-4",
+              "brick-5", "brick-5", "brick-6", "brick-7",
+              "brick-7", "brick-8", "brick-8", "brick-9",
+              "brick-9", "brick-10", "brick-10", "brick-11",
+              "brick-11", "brick-12", "brick-12", "brick-14",
+              "brick-14",
+
+              "oc-5", "oc-6", "oc-7", "oc-8",
+              "oc-9", "oc-10", "oc-11",
+
+              "ud0", "ud0", "ud0", "ud0",
+              "hydra", "hydra", "hydra", "hydra",
+              "ud1", "ud1", "ud1", "ud1",
+              "hooverdam", "hooverdam"]
 
 def getApacheClients(cfg):
-    lst = []
-    # XXX
-    cores = len(apacheList)
-    for n in range(cores):
-        lst.append(clients[apacheList[n]])
-    return lst
+    # Since our clients our rather heterogeneous, we fix the set of
+    # clients and instead vary the connection rate.
+    return [clients[h] for h in apacheList]
