@@ -126,7 +126,20 @@ import memcached
 
 memcached = mk(benchmark = memcached.runner, nonConst = True)
 
+# XXX Rename getMemcacheClients
 memcached *= mk(getLoadHosts = clients.getMemcacheClients)
+
+##################################################################
+# Apache
+#
+
+import apache
+
+apache = mk(benchmark = apache.runner, nonConst = True)
+
+apache *= mk(threadsPerCore = 24)
+apache *= mk(getApacheClients = clients.getApacheClients)
+apache *= mk(getApacheRate = lambda cfg: 100 + 400*cfg.cores)
 
 ##################################################################
 # Postgres
@@ -256,15 +269,14 @@ metis *= mk(order = ["rr"])
 # one configuration.  Furthermore, instead of computing the regular
 # product, we compute a "merge" product, where assignments from the
 # left will override assignments to the same variables from the right.
-#configSpace = (exim + postgres + gmake + psearchy + metis).merge(shared)
-#configSpace = (postgres + gmake + psearchy + metis).merge(shared)
-configSpace = memcached.merge(shared)
+#configSpace = (exim + memcached + apache + postgres + gmake + psearchy + metis).merge(shared)
 #configSpace = exim.merge(shared)
+#configSpace = memcached.merge(shared)
+configSpace = apache.merge(shared)
 #configSpace = postgres.merge(shared)
 #configSpace = gmake.merge(shared)
 #configSpace = psearchy.merge(shared)
 #configSpace = metis.merge(shared)
-#configSpace = (metis + exim).merge(shared)
 
 ##################################################################
 # Run
