@@ -15,11 +15,11 @@
 #include <inttypes.h>
 #endif
 
-#define __notret__ __attribute__((noreturn))
+#define __noret__ __attribute__((noreturn))
 #define __align__ __attribute__((aligned(CACHE_BYTES)))
 
-void __notret__ die(const char* errstr, ...);
-void __notret__ edie(const char* errstr, ...);
+void __noret__ die(const char* errstr, ...);
+void __noret__ edie(const char* errstr, ...);
 
 void setaffinity(int c);
 

@@ -1,53 +1,63 @@
-== Running MOSBENCH ==
+== Requirements ==
 
-MOSBENCH is a multi-host benchmark, so it's important to understand
-the roles of various hosts.  MOSBENCH involves three types of hosts:
+MOSBENCH's "primary host" runs the benchmark applications and should
+be a large multicore machine.  For the memcached and Apache
+benchmarks, it should have at very fast connection to the load
+generators.  For the Metis benchmark, it needs to have at least 20GB
+of RAM.  At MIT, our primary host is a 2.4GHz 8x6-core AMD Opteron
+8431 with 64 GB of RAM and an Intel 82599 10Gbit Ethernet card
+(IXGBE).
 
-The single "primary host" runs the benchmark applications.  It should
-be a large multicore machine.  For the Apache and Memcached
-benchmarks, it should have a very fast network connection to the load
-generators.
+The memcached, Apache, and Postgres benchmarks require a set of load
+generating client machines.  These machines should be on the same
+switch as the primary host.  At MIT, one client is 16-core machine
+with a 10GB network connection, and the rest are mostly 1- or 2-core
+machines with 1GB network connections.
 
-A set of "secondary hosts" act as load generators for the memcached,
-Apache, and Postgres benchmarks.  This list should *not* include the
-primary host.
+Finally, the benchmark driver can be run from a separate "driver
+host," which coordinates the benchmark applications and load
+generators and gathers results.  This document distinguishes between
+the primary host and the driver host, though in practice only
+configurations where the driver runs from the primary host are well
+tested.
 
-Finally, the "driver host" runs the driver script, which coordinates
-the benchmark programs and load generators on the primary and
-secondary hosts and gathers results.  It can be run from a primary or
-secondary host, though doing so may perturb the results.
+MOSBENCH must be installed on the primary host (and driver host, if
+separate), but does not need to be installed on the client machines.
+The client machines must have rsync, g++, httperf, and Postgres
+libraries (libpq-dev on Debian/Ubuntu).  The driver host will push any
+additional files to the clients as needed.
 
-MOSBENCH must be installed on the primary and driver hosts, but
-nothing needs to be installed on the secondary hosts.  The driver host
-will push files to the secondary hosts as needed.
 
 === Setup ===
 
 The driver host must be running an ssh agent and have ssh keys for
-passwordless access to all hosts except the host it is running on.  If
-you want the benchmark to hot plug cores, the user on the primary host
-must have sudo access.  A root shell is established only once at the
-beginning of a full benchmark run and reused throughout the run, so
-you should be prompted for your password at most once per run (or you
-can configure passwordless sudo access, if that doesn't make you
-cringe too much).
+passwordless access to all hosts other than the host it is running on.
+Most of the benchmarks require the user on the primary host to have
+sudo access in order to hotplug cores an to manipulate the ixgbe
+kernel module.  A root shell is established only once at the beginning
+of a full benchmark run and reused throughout the run, so you should
+be prompted for your password at most once per run (or you can
+configure passwordless sudo access, if that doesn't make you cringe
+too much).
 
 The configuration for the benchmark is stored in config.py on the
 driver host.  This file stores static configuration information like
-host names and the locations of various files, as well as which
-benchmarks to run and the full set of data points to gather results
-for.
+the locations of various files, as well as which benchmarks to run and
+the full set of data points to gather results for.  It depends on
+hosts.py, which lists the primary host and all client machines used by
+the benchmark.
 
 The benchmark applications must be compiled on the primary host.  To
 do so, simply run 'make all' from the MOSBENCH checkout directory on
-the primary host.
+the primary host.  There are also targets for building individual
+applications.
 
 Finally, most of the benchmarks require special file system mounts.
 To construct these, run 'sudo ./mkmounts <type>' from the MOSBENCH
 checkout directory, where <type> is the file system type configured
 for the 'fs' variable in config.py.  The default is tmpfs-separate.
 Additionally, Metis in hugetlb mode requires 'sudo ./mkmounts
-hugetlbfs'.
+hugetlb'.
 
 In summary,
 1. Set up ssh keys and optionally sudo access.
@@ -55,15 +65,17 @@ In summary,
 3. Build the benchmark suite on the primary host.
 4. Run mkmounts on the primary host.
 
+
 === Running ===
 
-Run 'make bench' on the driver host.
+First do a "sanity run" by setting sanityRun to True in config.py and
+running 'make bench' on the driver host.  This modifies the
+configuration to run with only 1 trial and the maximum number of cores
+in order to run through all of the benchmark configurations as quickly
+as possible and expose any configuration or setup problems.
 
-To work out kinks while minimizing wasted time, run first with only 1
-trial (trials = 1 in config.py) and the maximum number of cores (cores
-= [#cores] in config.py).  This should run through all of the
-benchmark configurations as quickly as possible and highlight any
-configuration or setup problems.
+Once that works, set sanityRun to False and run 'make bench'.
+
 
 === Analyzing results ===
 
@@ -81,7 +93,9 @@ benchmark.
 To graph benchmark results, use 'graph'.  Run graph with no arguments
 for usage information.
 
-XXX showexp
+Each data point also records detailed configuration information in an
+"info" file in that data point's directory.  Currently there is no
+tool to examine these directly, but it's just a Python pickle.
 
 
 == Troubleshooting ==

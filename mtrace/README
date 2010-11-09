@@ -1,0 +1,9 @@
+$ qemu-img create disk.img 300M
+$ mkfs.ext3 disk.img
+# mount -o loop disk.img disk
+# debootstrap --arch amd64 --exclude=udev --include=python squeeze disk http://ftp.debian.org/debian/
+# cd disk/dev
+# MAKEDEV ttyS
+Update /etc/shadow
+Add the following to /tmp/disk/etc/inittab:
+T0:123:respawn:/sbin/getty -L ttyS0 9600 vt100
