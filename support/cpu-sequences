@@ -10,11 +10,15 @@ def rr(cpuinfo):
         phys = set()
         next = []
         for cpu in cpuinfo:
-            if cpu["physical id"] not in phys:
-                phys.add(cpu["physical id"])
-                yield cpu
+            if "physical id" in cpu:
+                if cpu["physical id"] not in phys:
+                    phys.add(cpu["physical id"])
+                    yield cpu
+                else:
+                    next.append(cpu)
             else:
-                next.append(cpu)
+                yield cpu
+
         cpuinfo = next
 
 # Sequential assignment
