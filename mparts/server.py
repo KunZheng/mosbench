@@ -1,6 +1,6 @@
 from __future__ import with_statement
 
-import sys, os, subprocess, errno, hashlib, threading, signal
+import sys, os, subprocess, errno, hashlib, threading, signal, gzip
 from mparts.rpc import RPCServer, RPCProxy
 
 LOG_COMMANDS = False
@@ -298,6 +298,12 @@ class RemoteHost(object):
 
     def readFile(self, path):
         return file(path).read()
+
+    def readGzipFile(self, path):
+        f = gzip.open(path, 'rb')
+        content = f.read()
+        f.close()
+        return content
 
 def main():
     sys.stdout = sys.stderr

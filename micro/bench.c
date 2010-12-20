@@ -50,7 +50,6 @@ void setaffinity(int c)
 		edie("setaffinity, processor_bind failed");
 #else
 	cpu_set_t cpuset;
-	c = c % sysconf(_SC_NPROCESSORS_ONLN);
 	CPU_ZERO(&cpuset);
 	CPU_SET(c, &cpuset);
 	if (sched_setaffinity(0, sizeof(cpuset), &cpuset) < 0)
