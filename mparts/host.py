@@ -348,19 +348,24 @@ class HostInfo(Task):
         self.kernel = uname.split()[2]
 
         # Get kernel configuration
-        #
-        # XXX Perhaps we should try /proc/config.gz first, since
-        # that's guaranteed to be the truth
-        configPath = "/boot/config-%s" % self.kernel
+        # Try /proc/config.gz first
+        configPath = "/proc/config.gz"
+        dstExt = ""
         try:
-            config = self.host.r.readFile(configPath)
+            config = self.host.r.readGzipFile(configPath)            
+            dstExt = ".gz"
         except EnvironmentError, e:
-            self.log("Failed to fetch kernel config: %s" % e)
-        else:
-            self.kconfig = self.__parseConfig(config)
-            self.host.r.run(["cp", configPath,
-                             os.path.join(self.host.outDir(),
-                                          self.name + ".kconfig")])
+            configPath = "/boot/config-%s" % self.kernel
+            try:
+                config = self.host.r.readFile(configPath)
+            except EnvironmentError, e:
+                self.log("Failed to fetch kernel config: %s" % e)
+                return
+
+        self.kconfig = self.__parseConfig(config)
+        self.host.r.run(["cp", configPath,
+                         os.path.join(self.host.outDir(),
+                                      self.name + ".kconfig" + dstExt)])
 
     def __parseConfig(self, config):
         res = {}
