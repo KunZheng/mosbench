@@ -116,8 +116,12 @@ class SetCPUs(Task, SourceFileProvider):
         # oprofile has a habit of panicking if you hot plug CPU's
         # under it
         if self.hotplug:
-            self.host.sudo.run(["opcontrol", "--deinit"],
-                               wait = UNCHECKED)
+            try:
+                self.host.sudo.run(["opcontrol", "--deinit"],
+                                   wait = UNCHECKED)
+            except OSError, e:
+                if e.errno != errno.ENOENT:
+                    raise
 
         if self.host not in CPU_CACHE:
             # Make sure all CPU's are online.  If we're not allowed to
