@@ -581,11 +581,13 @@ void *dofiles(void *arg)
   //  printf("prime %d\n", ps.maxhash);
 
   ps.table = (struct Bucket *)malloc(sizeof(struct Bucket) * ps.maxhash);
+  memset(ps.table, 0, sizeof(struct Bucket) * ps.maxhash);
   ps.wordi = 0;
   ps.infoi = 0;
 
   ps.maxblocks = NBYTES/sizeof(struct Block);
   ps.blocks = (struct Block *) malloc(ps.maxblocks * sizeof(struct Block));
+  memset(ps.blocks, 0, ps.maxblocks * sizeof(struct Block));
   ps.blocki = 0;
   
   ps.nstrcmp = 0;
