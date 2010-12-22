@@ -19,8 +19,11 @@
 #include <sys/prctl.h>
 #include <sched.h>
 
+#include "mtrace-magic.h"
+
 static int total;
 static double start;
+static int mtrace_enable;
 
 static void usage(void)
 {
@@ -131,14 +134,29 @@ static void do1(struct sockaddr_in *sin, const char *user, const char *from)
 	close(s);
 }
 
-static void reset(int sig)
+static void reset(void)
 {
 	total = 0;
 	start = now();
 }
 
-static void printTotal(int sig)
+static void mtrace_toggle(void)
 {
+	mtrace_enable_set(!mtrace_enable, "smtpbm", strlen("smtpbm"));
+	mtrace_enable = !mtrace_enable;
+}
+
+static void sig_reset(int sig)
+{
+	reset();
+	mtrace_toggle();
+}
+
+static void print_total(int sig)
+{
+	if (mtrace_enable)
+		mtrace_toggle();
+
 	printf("%d messages; %.2f messages/sec\n",
 	       total, total / (now() - start));
 	fflush(stdout);
@@ -169,9 +187,9 @@ int main(int argc, char ** argv)
 	if(getppid() == 1)
 		oops("parent exited early");
 
-	signal(SIGUSR1, reset);
-	signal(SIGUSR2, printTotal);
-	signal(SIGINT, printTotal);
+	signal(SIGUSR1, sig_reset);
+	signal(SIGUSR2, print_total);
+	signal(SIGINT, print_total);
 
 	memset(&sin, '\0', sizeof(sin));
 	sin.sin_family = AF_INET;
@@ -180,7 +198,7 @@ int main(int argc, char ** argv)
 	if(sin.sin_addr.s_addr == INADDR_NONE)
 		usage();
 
-	reset(0);
+	reset();
 	while(1)
 		do1(&sin, argv[3], argv[4]);
 }
