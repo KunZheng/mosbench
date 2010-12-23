@@ -27,7 +27,7 @@ shared *= mk(primaryHost = hosts.primaryHost)
 
 # benchRoot specifies the directory on the primary host where MOSBENCH
 # was checked out or unpacked.
-shared *= mk(benchRoot = "~/mosbench")
+shared *= mk(benchRoot = "/home/sbw/mosbench")
 
 # textRoot specifies the directory on the primary host where the text
 # to use for the Psearchy indexing benchmark can be found.  To
@@ -65,7 +65,7 @@ shared *= mk(hotplug = True)
 # configuration for the graphing tools to work (which also means it
 # generally shouldn't be overridden per benchmark).
 if sanityRun:
-    shared *= mk(cores = [48], nonConst = True)
+    shared *= mk(cores = [2], nonConst = True)
 else:
     shared *= mk(cores = [1] + range(0, 49, 4)[1:], nonConst = True)
 
@@ -86,7 +86,7 @@ exim = mk(benchmark = exim.runner, nonConst = True)
 
 exim *= mk(eximBuild = "exim-mod")
 exim *= mk(eximPort = 2526)
-exim *= mk(clients = 96)
+exim *= mk(clients = 4)
 
 ##################################################################
 # memcached
@@ -262,9 +262,9 @@ metis *= mk(order = ["rr"])
 # one configuration.  Furthermore, instead of computing the regular
 # product, we compute a "merge" product, where assignments from the
 # left will override assignments to the same variables from the right.
-configSpace = ((exim + memcached + apache + postgres + gmake + psearchy + metis)
-               .merge(shared))
-#configSpace = exim.merge(shared)
+#configSpace = ((exim + memcached + apache + postgres + gmake + psearchy + metis)
+#               .merge(shared))
+configSpace = exim.merge(shared)
 #configSpace = memcached.merge(shared)
 #configSpace = apache.merge(shared)
 #configSpace = postgres.merge(shared)

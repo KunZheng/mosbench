@@ -28,7 +28,7 @@ import support.rsshash as rsshash
 
 # Use "cmdModifier = perfLocked" if you use the "perflock" script to
 # prevent conflicting machine access.  You probably don't.
-tom = Host("tom.csail.mit.edu", cmdModifier = perfLocked)
+tom = Host("wether.csail.mit.edu")
 
 clientHosts = ["josmp.csail.mit.edu",
                "oc-5.csail.mit.edu", "oc-6.csail.mit.edu",
