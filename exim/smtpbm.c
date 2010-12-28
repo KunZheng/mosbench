@@ -19,7 +19,7 @@
 #include <sys/prctl.h>
 #include <sched.h>
 
-#include "mtrace-magic.h"
+#include "support/mtrace.h"
 
 static int total;
 static double start;

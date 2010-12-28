@@ -1,3 +1,6 @@
+-include ../config.mk
+SUPPORT = ../support
+
 # Quiet compile, unset for verbose output
 Q	= @
 OS 	= $(shell uname)
@@ -9,7 +12,7 @@ CWARNS	= -Wformat=2 -Wextra -Wmissing-noreturn -Wwrite-strings -Wshadow \
 	  -Wswitch-default -Wmissing-prototypes \
 	  -Wmissing-declarations
 CFLAGS  = -D_GNU_SOURCE -Wall -Werror -fno-strict-aliasing $(CWARNS) \
-	  -g -O3
+	  -g -O3 -I..
 
 # Build Exim with our tweaked libdb
 DBMDIR  = $(abspath ../libdb/db4.7-mod)
@@ -33,7 +36,7 @@ endif
 
 all: smtpbm exim-mod
 
-smtpbm: smtpbm.c
+smtpbm: smtpbm.c $(SUPPORT)/mtrace.h
 	@echo "CC	$@"
 	$(Q)$(CC) $(CFLAGS) -o $@ $< $(LIBS)
 clean:

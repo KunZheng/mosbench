@@ -1,4 +1,4 @@
-TARGETS=exim memcached apache postgres gmake psearchy metis
+TARGETS=exim memcached apache postgres gmake psearchy metis micro
 
 all: $(addprefix all-,$(TARGETS))
 clean: $(addprefix clean-,$(TARGETS))
@@ -53,6 +53,12 @@ all-metis: always
 clean-metis: always
 	$(MAKE) -C metis O=obj.default clean
 	$(MAKE) -C metis O=obj.hugetlb clean
+
+all-micro: always
+	$(MAKE) -C micro all
+
+clean-micro: always
+	$(MAKE) -C micro clean
 
 .PHONY: bench
 bench:
