@@ -18,7 +18,7 @@
 #include <fcntl.h>
 
 #include "bench.h"
-#include "mtrace.h"
+#include "support/mtrace.h"
 
 #define NPMC 3
 

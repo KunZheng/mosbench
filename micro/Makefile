@@ -1,5 +1,5 @@
-# Location of the qemu mtrace header files
-QEMUDIR = /home/sbw/qemu
+-include ../config.mk
+SUPPORT = ../support
 
 # Quiet compile, unset for verbose output
 Q	= @
@@ -17,10 +17,10 @@ CWARNS	= -Wformat=2 -Wextra -Wmissing-noreturn -Wwrite-strings -Wshadow \
 	  -Wswitch-default -Wmissing-prototypes \
 	  -Wmissing-declarations
 CFLAGS  = $(DEFS) -Wall -Werror -fno-strict-aliasing $(CWARNS) \
-	  -g -O3 -D_GNU_SOURCE -m64 $(MTRACE)
+	  -g -O3 -D_GNU_SOURCE -m64 $(MTRACE) -I..
 
 LIBS	= bench.c
-DEPS	= bench.h mtrace.h config.h $(LIBS) $(MTRACEDEP)
+DEPS	= bench.h config.h $(LIBS) $(MTRACEDEP) $(SUPPORT)/mtrace.h
 
 BINS	= memclone fops-dir proc-ping-pong
 BINS	:= $(addprefix $(O)/, $(BINS))
