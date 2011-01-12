@@ -1,5 +1,5 @@
 # Location of the qemu mtrace header files
-QEMUDIR ?=
+QEMUDIR ?= /home/sbw/qemu
 
 
 

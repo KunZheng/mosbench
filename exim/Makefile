@@ -12,7 +12,7 @@ CWARNS	= -Wformat=2 -Wextra -Wmissing-noreturn -Wwrite-strings -Wshadow \
 	  -Wswitch-default -Wmissing-prototypes \
 	  -Wmissing-declarations
 CFLAGS  = -D_GNU_SOURCE -Wall -Werror -fno-strict-aliasing $(CWARNS) \
-	  -g -O3 -I..
+	  -g -O3 -I.. $(MTRACE_CFLAGS)
 
 # Build Exim with our tweaked libdb
 DBMDIR  = $(abspath ../libdb/db4.7-mod)
@@ -25,7 +25,7 @@ DBMDIR  = $(abspath ../libdb/db4.7-mod)
 EXIM_DEFINES = \
 	-DMOSBENCH_FAKE_LOADAVG -DMOSBENCH_WAIT_DELIVERY \
 	-DMOSBENCH_NO_TZ_LOCK \
-	-DMOSBENCH_SPLIT_BY_PID
+	-DMOSBENCH_SPLIT_BY_PID -DMOSBENCH_CPU_BIND -DMOSBENCH_DELIVER_SAME_CORE -DMOSBENCH_NO_J_FILE
 
 ifeq ($(OS), Linux)
 LIBS = 
@@ -38,7 +38,7 @@ all: smtpbm exim-mod
 
 smtpbm: smtpbm.c $(SUPPORT)/mtrace.h
 	@echo "CC	$@"
-	$(Q)$(CC) $(CFLAGS) -o $@ $< $(LIBS)
+	$(Q)$(CC) $(CFLAGS) -o $@ $< $(LIBS) 
 clean:
 	@echo "CLEAN"
 	$(Q)rm -rf smtpbm
