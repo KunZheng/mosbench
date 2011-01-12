@@ -8,9 +8,9 @@ __all__ = []
 
 __all__.append("EximDaemon")
 class EximDaemon(Task):
-    __info__ = ["host", "eximPath", "eximBuild", "mailDir", "spoolDir", "port"]
+    __info__ = ["host", "eximPath", "eximBuild", "mailDir", "spoolDir", "port", "numInstances"]
 
-    def __init__(self, host, eximPath, eximBuild, mailDir, spoolDir, port):
+    def __init__(self, host, eximPath, eximBuild, mailDir, spoolDir, port, numInstances):
         Task.__init__(self, host = host)
         self.host = host
         self.eximPath = eximPath
@@ -18,32 +18,43 @@ class EximDaemon(Task):
         self.mailDir = mailDir
         self.spoolDir = spoolDir
         self.port = port
-        self.__proc = None
+        self.numInstances = numInstances
+        self.__proc = []
 
-    def start(self):
+    def __iPath(self, string, i):
+        return string + "-" + str(i)
+
+    def __start(self, i):
         # Create configuration
-        config = self.host.outDir(self.name + ".configure")
+        config = self.host.outDir(self.__iPath(self.name + ".configure", i))
         self.host.r.run(
             [os.path.join(self.eximPath, "mkconfig"),
-             os.path.join(self.eximPath, self.eximBuild),
-             self.mailDir, self.spoolDir],
+             os.path.join(self.eximPath, self.__iPath(self.eximBuild, i)),
+             self.__iPath(self.mailDir, i), self.__iPath(self.spoolDir, i)],
             stdout = config)
 
         # Start Exim
-        self.__proc = self.host.r.run(
-            [os.path.join(self.eximPath, self.eximBuild, "bin", "exim"),
-             "-bdf", "-oX", str(self.port), "-C", config],
+        proc  = self.host.r.run(
+            [os.path.join(self.eximPath, self.__iPath(self.eximBuild, i), "bin", "exim"),
+             "-bdf", "-oX", str(self.port + i), "-C", config],
             wait = False)
-        waitForLog(self.host, os.path.join(self.spoolDir, "log", "mainlog"),
+        self.__proc.append(proc)
+
+        waitForLog(self.host, os.path.join(self.__iPath(self.spoolDir, i), "log", "mainlog"),
                    "exim", 5, "listening for SMTP")
 
+    def start(self):
+        for i in range(0, self.numInstances):
+            self.__start(i)
+
     def stop(self):
-        # Ugh, there's no way to cleanly shut down Exim, so we can't
-        # check for a sensible exit code.
-        self.__proc.kill(signal.SIGTERM)
+        for p in self.__proc:
+            # Ugh, there's no way to cleanly shut down Exim, so we can't
+            # check for a sensible exit code.
+            p.kill(signal.SIGTERM)
 
     def reset(self):
-        if self.__proc:
+        if len(self.__proc) > 0:
             self.stop()
 
 __all__.append("EximLoad")
@@ -107,7 +118,8 @@ class EximRunner(object):
         m += EximDaemon(host, eximPath, cfg.eximBuild,
                         os.path.join(fs.path + "0"),
                         os.path.join(fs.path + "spool"),
-                        cfg.eximPort)
+                        cfg.eximPort,
+                        cfg.numInstances)
         sysmon = SystemMonitor(host)
         m += sysmon
         for trial in range(cfg.trials):

@@ -34,7 +34,7 @@ ifeq ($(OS), SunOS)
 LIBS = -lsocket -lnsl
 endif
 
-all: smtpbm exim-mod
+all: smtpbm exim-mod-0
 
 smtpbm: smtpbm.c $(SUPPORT)/mtrace.h
 	@echo "CC	$@"
@@ -43,9 +43,8 @@ clean:
 	@echo "CLEAN"
 	$(Q)rm -rf smtpbm
 
-
-.PHONY: exim-mod
-exim-mod:
+.PHONY: exim-mod-*
+exim-mod-%:
 	mkdir -p exim-4.71/Local
 	sed -e "s,@INSTALL_DIR@,`pwd`/$@,;s,@USER@,$$USER,;s,@DBMDIR@,$(DBMDIR),;s,@DEFINES@,$(EXIM_DEFINES)," \
 	  < Local-Makefile.tmpl > exim-4.71/Local/Makefile.tmp
