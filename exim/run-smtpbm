@@ -8,7 +8,7 @@ DURATION = 5
 CORES = file("/proc/cpuinfo").read().count("processor\t")
 
 def usage():
-    print >> sys.stderr, "Usage: %s count port" % sys.argv[0]
+    print >> sys.stderr, "Usage: %s count port [eximInstances]" % sys.argv[0]
     sys.exit(2)
 
 def setup():
@@ -20,7 +20,7 @@ def setup():
     # Get into the right directory
     os.chdir(os.path.dirname(sys.argv[0]))
 
-def startLoad(count, port):
+def startLoad(count, port, eximInstances):
     # Start smtpbm
     procs = []
     for i in range(count):
@@ -29,7 +29,7 @@ def startLoad(count, port):
         # altogether).
         procs.append(
             subprocess.Popen(["numactl", "-C", str(i % CORES),
-                              "./smtpbm", "127.0.0.1", str(port),
+                              "./smtpbm", "127.0.0.1", str(port + (i % eximInstances)),
                               "%d@mosbench.org" % i, "mosbench@mosbench.org",
                               ],
                              stdout = subprocess.PIPE))
@@ -107,13 +107,19 @@ def prettyWait(status):
         return "signal %d" % os.WTERMSIG(status)
     return "unknown wait status %d" % status
 
-if len(sys.argv) != 3 or not sys.argv[1].isdigit() or not sys.argv[2].isdigit():
+if len(sys.argv) < 3 or not sys.argv[1].isdigit() or not sys.argv[2].isdigit():
     usage()
 
 count, port = int(sys.argv[1]), int(sys.argv[2])
+eximInstances = 1
+if len(sys.argv) == 4:
+    eximInstances = int(sys.argv[3])
+    if eximInstances > count:
+        print >> sys.stderr, "Oops: eximInstances greater than count"
+        sys.exit(2)
 
 setup()
-procs = startLoad(count, port)
+procs = startLoad(count, port, eximInstances)
 time.sleep(WARMUP)
 startCounting(procs)
 run(procs, DURATION)

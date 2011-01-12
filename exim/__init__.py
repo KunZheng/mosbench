@@ -59,10 +59,10 @@ class EximDaemon(Task):
 
 __all__.append("EximLoad")
 class EximLoad(Task, ResultsProvider):
-    __info__ = ["host", "trial", "eximPath", "clients", "port", "*sysmonOut"]
+    __info__ = ["host", "trial", "eximPath", "clients", "port", "*sysmonOut", "numInstances"]
 
     # XXX Control warmup/duration
-    def __init__(self, host, trial, eximPath, cores, clients, port, sysmon):
+    def __init__(self, host, trial, eximPath, cores, clients, port, sysmon, numInstances):
         Task.__init__(self, host = host, trial = trial)
         ResultsProvider.__init__(self, cores)
         self.host = host
@@ -71,13 +71,14 @@ class EximLoad(Task, ResultsProvider):
         self.clients = clients
         self.port = port
         self.sysmon = sysmon
+        self.numInstances = numInstances
 
     def wait(self):
         # We may want to wipe out old mail files, but it doesn't seem
         # to make a difference.
 
         cmd = [os.path.join(self.eximPath, "run-smtpbm"),
-               str(self.clients), str(self.port)]
+               str(self.clients), str(self.port), str(self.numInstances)]
         cmd = self.sysmon.wrap(cmd, "Starting", "Stopped")
 
         # Run
@@ -126,7 +127,7 @@ class EximRunner(object):
             # XXX It would be a pain to make clients dependent on
             # cfg.cores.
             m += EximLoad(host, trial, eximPath, cfg.cores,
-                          cfg.clients, cfg.eximPort, sysmon)
+                          cfg.clients, cfg.eximPort, sysmon, cfg.numInstances)
         # m += cfg.monitors
         m.run()
 
