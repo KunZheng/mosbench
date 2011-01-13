@@ -3,7 +3,7 @@
 import sys, os, signal, subprocess, errno, time
 
 WARMUP = 3
-DURATION = 5
+DURATION = 10
 
 CORES = file("/proc/cpuinfo").read().count("processor\t")
 
