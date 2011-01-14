@@ -2,7 +2,9 @@
 
 set -e
 
-BASE=/tmp/mosbench
+if [ -z "$BASE" ]; then
+    BASE=/tmp/mosbench
+fi
 
 usage() {
     cat >&2 <<EOF

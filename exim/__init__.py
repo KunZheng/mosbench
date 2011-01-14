@@ -8,11 +8,46 @@ __all__ = []
 
 CORES = file("/proc/cpuinfo").read().count("processor\t")
 
+class EximLauncher:
+    def __init__(self, host):
+        self.host = host
+
+    def run(self, cmdArgs):
+        return self.host.r.run(cmdArgs, wait = False)
+
+    def runOnCpu(self, cpu, cmdArgs):
+        cmd = [ "numactl", "-C", str(cpu) ]
+        cmd.extend(cmdArgs)
+        return self.host.r.run(cmd, wait = False)
+
+    def importFile(self, path):
+        pass
+
+class EximChrooter:
+    def __init__(self, path, host):
+        self.path = path
+        self.host = host
+
+    def run(self, cmdArgs):
+        cmd = [ "chroot", self.path ]
+        cmd.extend(cmdArgs)
+        return self.host.r.run(cmd, wait = False)
+
+    def runOnCpu(self, cpu, cmdArgs):
+        cmd = [ "numactl", "-C", str(cpu), "chroot", self.path ]
+        cmd.extend(cmdArgs)
+        return self.host.r.run(cmd, wait = False)
+
+    def importFile(self, path):
+        self.host.r.run(["rsync", "-aR", path, self.path])
+
 __all__.append("EximDaemon")
 class EximDaemon(Task):
-    __info__ = ["host", "eximPath", "eximBuild", "mailDir", "spoolDir", "port", "numInstances"]
+    __info__ = ["host", "eximPath", "eximBuild", "mailDir", "spoolDir", "port", 
+                "numInstances", "chrootBase"]
 
-    def __init__(self, host, eximPath, eximBuild, mailDir, spoolDir, port, numInstances):
+    def __init__(self, host, eximPath, eximBuild, mailDir, spoolDir, port, 
+                 numInstances, chrootBase):
         Task.__init__(self, host = host)
         self.host = host
         self.eximPath = eximPath
@@ -22,11 +57,18 @@ class EximDaemon(Task):
         self.port = port
         self.numInstances = numInstances
         self.__proc = []
+        self.chrootBase = chrootBase
 
     def __iPath(self, string, i):
         return string + "-" + str(i)
 
-    def __start(self, i):
+    def __start(self, i, chrootBase = None):
+        launcher = None
+        if chrootBase == None:
+            launcher = EximLauncher(self.host)
+        else:
+            launcher = EximChrooter(chrootBase, self.host)
+
         # Create configuration
         config = self.host.outDir(self.__iPath(self.name + ".configure", i))
         self.host.r.run(
@@ -38,27 +80,36 @@ class EximDaemon(Task):
         self.host.r.run(
             ["rm", "-f", os.path.join(self.__iPath(self.spoolDir, i), "log", "mainlog")])
 
+        launcher.importFile(config)
+
         # Start Exim
         if self.numInstances > 1:
-            proc  = self.host.r.run(
-                ["numactl", "-C", str(i % CORES),
-                 os.path.join(self.eximPath, self.__iPath(self.eximBuild, i), "bin", "exim"),
-                 "-bdf", "-oX", str(self.port + i), "-C", config],
-                wait = False)
+            proc  = launcher.runOnCpu(
+                i % CORES, 
+                [os.path.join(self.eximPath, self.__iPath(self.eximBuild, i), "bin", "exim"),
+                 "-bdf", "-oX", str(self.port + i), "-C", config])
             self.__proc.append(proc)
         else:
-            proc  = self.host.r.run(
+            proc  = launcher.run(
                 [os.path.join(self.eximPath, self.__iPath(self.eximBuild, i), "bin", "exim"),
-                 "-bdf", "-oX", str(self.port + i), "-C", config],
-                wait = False)
+                 "-bdf", "-oX", str(self.port + i), "-C", config])
             self.__proc.append(proc)
 
-        waitForLog(self.host, os.path.join(self.__iPath(self.spoolDir, i), "log", "mainlog"),
-                   "exim", 5, "listening for SMTP")
+        if chrootBase == None:
+            waitForLog(self.host, 
+                       os.path.join(self.__iPath(self.spoolDir, i), "log", "mainlog"),
+                       "exim", 5, "listening for SMTP")
+        else:
+            waitForLog(self.host, 
+                       chrootBase + os.path.join(self.__iPath(self.spoolDir, i), "log", "mainlog"),
+                       "exim", 5, "listening for SMTP")
 
     def start(self):
         for i in range(0, self.numInstances):
-            self.__start(i)
+            if self.chrootBase:
+                self.__start(i, chrootBase = self.chrootBase + "-" + str(i))
+            else:
+                self.__start(i)
 
     def stop(self):
         for p in self.__proc:
@@ -130,11 +181,13 @@ class EximRunner(object):
         m += fs
         eximPath = os.path.join(cfg.benchRoot, "exim")
         m += SetCPUs(host = host, num = cfg.cores)
+
         m += EximDaemon(host, eximPath, cfg.eximBuild,
                         os.path.join(fs.path),
                         os.path.join(fs.path + "spool"),
                         cfg.eximPort,
-                        cfg.numInstances)
+                        cfg.numInstances,
+                        cfg.eximChrootBase)
         sysmon = SystemMonitor(host)
         m += sysmon
         for trial in range(cfg.trials):
