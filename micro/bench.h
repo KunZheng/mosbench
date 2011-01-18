@@ -68,6 +68,16 @@ static inline void nop_pause(void)
 	__asm __volatile("pause");
 }
 
+static inline void rep_nop(void)
+{
+	__asm __volatile("rep; nop" ::: "memory");
+}
+
+static inline void cpu_relax(void)
+{
+	rep_nop();
+}
+
 #if ENABLE_PMC
 static inline uint64_t read_pmc(uint32_t ecx)
 {
