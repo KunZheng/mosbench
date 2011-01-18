@@ -87,7 +87,11 @@ exim = mk(benchmark = exim.runner, nonConst = True)
 exim *= mk(eximBuild = "exim-mod")
 exim *= mk(eximPort = 2526)
 exim *= mk(clients = 8)
-exim *= mk(numInstances = 1)
+exim *= mk(eximChrootBase = "/home/sbw/mosbench/chroot")
+exim *= mk(numInstances = 2)
+
+#exim *= mk(eximChrootBase = "/home/sbw/mosbench/chroot")
+#exim *= mk(numInstances = 2)
 
 ##################################################################
 # memcached
