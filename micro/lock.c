@@ -10,6 +10,7 @@
 
 #include "bench.h"
 #include "spinlock.h"
+#include "list.h"
 
 static spinlock_t lock = SPIN_LOCK_UNLOCKED;
 static unsigned int ncores;
@@ -24,8 +25,14 @@ struct counter {
 	volatile uint64_t v;
 	char pad[0] __attribute__((aligned(64)));
 };
-
 static struct counter *the_counter;
+
+struct linky {
+	struct list_head link;
+	char pad[0] __attribute__((aligned(64)));
+};
+static struct linky *the_linky;
+static struct list_head the_list;
 
 static unsigned int id2core[] = {
 	0,  1,  2,  3,  4,  5,
@@ -101,12 +108,15 @@ static void *worker(void *x)
 	} else {
 		while (go == 0)
 			cpu_relax();
+		spin(1000 * id);
 	}
 
 	while (go == 1) {
 		spin(unlock_cycles);
 		spin_lock(&lock);
-		spin(lock_cycles);
+		list_del(the_list.next);
+		list_add(&the_linky[id].link, &the_list);
+		//spin(lock_cycles);
 		spin_unlock(&lock);
 
 		c->v++;
@@ -130,6 +140,11 @@ int main(int ac, char **av)
 	unlock_cycles = atoi(av[4]);
 
 	the_counter = xmalloc(sizeof(*the_counter) * ncores);
+	the_linky = xmalloc(sizeof(*the_linky) * ncores);
+
+	INIT_LIST_HEAD(&the_list);
+	list_add(&the_linky[0].link, &the_list);
+
 	th = xmalloc(sizeof(pthread_t) * ncores);
 
 	for (i = 1; i < ncores; i++) {

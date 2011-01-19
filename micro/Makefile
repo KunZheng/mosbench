@@ -20,7 +20,7 @@ CFLAGS  = $(DEFS) -Wall -Werror -fno-strict-aliasing $(CWARNS) \
 	  -g -O3 -D_GNU_SOURCE -m64 $(MTRACE) -I..
 
 LIBS	= bench.c
-DEPS	= bench.h config.h $(LIBS) $(MTRACEDEP) $(SUPPORT)/mtrace.h
+DEPS	= bench.h config.h list.h $(LIBS) $(MTRACEDEP) $(SUPPORT)/mtrace.h
 
 BINS	= memclone fops-dir proc-ping-pong lock
 BINS	:= $(addprefix $(O)/, $(BINS))
