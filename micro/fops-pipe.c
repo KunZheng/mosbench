@@ -1,8 +1,8 @@
 /*
- * Operate (XOP) on per-process files in the same directory.
+ * Operate on per-process files in the same directory and use a pipe.
  */
 
-#define TESTNAME "fops_dir"
+#define TESTNAME "fops_pipe"
 
 #include <sys/mman.h>
 #include <sys/types.h>
