@@ -43,7 +43,7 @@ static void __noret__ sighandler(int x)
 	float one;
 	int i;
 
-	mtrace_enable_set(0, TESTNAME, sizeof(TESTNAME));
+	mtrace_enable_set(0, TESTNAME);
 	
 	stop = usec();
 	
@@ -80,7 +80,7 @@ int main(int ac, char **av)
 		die("signal failed\n");
 	alarm(time);
 
-	mtrace_enable_set(1, TESTNAME, sizeof(TESTNAME));
+	mtrace_enable_set(1, TESTNAME);
 	start = usec();
 	for (; ; tot++) {
 		uint64_t pmc;

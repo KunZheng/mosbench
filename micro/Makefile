@@ -17,12 +17,12 @@ CWARNS	= -Wformat=2 -Wextra -Wmissing-noreturn -Wwrite-strings -Wshadow \
 	  -Wswitch-default -Wmissing-prototypes \
 	  -Wmissing-declarations
 CFLAGS  = $(DEFS) -Wall -Werror -fno-strict-aliasing $(CWARNS) \
-	  -g -O3 -D_GNU_SOURCE -m64 $(MTRACE) -I..
+	  -g -O2 -D_GNU_SOURCE -m64 $(MTRACE) -I..
 
 LIBS	= bench.c
 DEPS	= bench.h config.h $(LIBS) $(MTRACEDEP) $(SUPPORT)/mtrace.h
 
-BINS	= memclone fops-dir proc-ping-pong
+BINS	= memclone fops-dir proc-ping-pong fops-pipe
 BINS	:= $(addprefix $(O)/, $(BINS))
 
 all: $(BINS)
