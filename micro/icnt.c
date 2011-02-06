@@ -1,8 +1,8 @@
 /*
- * Operate (XOP) on per-process files in the same directory.
+ * atomic inc as fast as possible
  */
 
-#define TESTNAME "fops_dir"
+#define TESTNAME "icnt"
 
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -19,21 +19,18 @@
 
 #include "bench.h"
 #include "support/mtrace.h"
-#include "forp.h"
+#include "atomic.h"
 
+#define GHZ 2.411529f
 #define NPMC 3
-
 #define MAX_PROC 256
-
-#define XOP xopen
 
 static uint64_t start;
 
 static unsigned int ncores;
-static unsigned int nprocs;
+static unsigned int nclines;
 static unsigned int the_time;
-static unsigned int close_fd;
-static char *the_file;
+static unsigned int max_ndx;
 
 static uint64_t pmc_start[NPMC];
 static uint64_t pmc_stop[NPMC];
@@ -44,35 +41,16 @@ static struct {
 		char pad[64];
 	} count[MAX_PROC];
 	volatile int run;
+	
+	atomic_t *buffer;
 } *shared;
-
-static inline void xopen(const char *fn)
-{
-	int fd = open(fn, O_RDONLY);
-	if (fd < 0)
-		edie("open");
-	close(fd);
-}
-
-static inline void xstat(const char *fn)
-{
-	struct stat st;
-	if (stat(fn, &st))
-		edie("stat");
-}
-
-static inline void xgettid(const char *fn)
-{
-	syscall(SYS_gettid);
-}
 
 static void sighandler(int x)
 {
-	float sec, rate, one;
+	double cyc, rate, lat;
 	uint64_t stop, tot;
 	unsigned int i;
 
-	forp_stop();
 	mtrace_enable_set(0, TESTNAME);
 
 	for (i = 0; i < NPMC; i++)
@@ -82,32 +60,38 @@ static void sighandler(int x)
 	shared->run = 0;
 
 	tot = 0;
-	for (i = 0; i < nprocs; i++)
+	for (i = 0; i < ncores; i++)
 		tot += shared->count[i].v;
 
-	sec = (float)(stop - start) / 1000000;
-	rate = (float)tot / sec;
-	one = (float)(stop - start) / (float)tot;
+	cyc = (double)(stop - start) * 1000 * GHZ;
+	rate = (double)tot / cyc;
+	lat = (1.0f / rate) * (float)ncores;
 
-	printf("rate: %f per sec\n", rate);
-	printf("lat: %f usec\n", one);
+	printf("rate: %f per cycles\n", rate);
+	printf("late: %f\n", lat);
 
 	for (i = 0; i < NPMC; i++) {
-		rate = (float)(pmc_stop[i] - pmc_start[i]) / 
-			(float) shared->count[0].v;
+		rate = (double)(pmc_stop[i] - pmc_start[i]) / 
+			(double) shared->count[0].v;
 		printf("pmc(%u): %f per op\n", i, rate);
 	}
 }
 
-static void test(unsigned int proc)
+static inline void op_cline(unsigned int ndx)
 {
-	char fn[128];
-	
-	setaffinity(proc % ncores);
+	atomic_inc(&shared->buffer[ndx]);
+}
 
-	snprintf(fn, sizeof(fn), "%s.%d", the_file, 0);
+static void test(unsigned int core)
+{
+	register unsigned int mask;
+	register uint32_t seed;
 
-	if (proc == 0) {
+	setaffinity(core);
+	seed = getpid();
+	mask = max_ndx - 1;
+
+	if (core == 0) {
 		unsigned int i;
 
 		if (signal(SIGALRM, sighandler) == SIG_ERR)
@@ -118,7 +102,6 @@ static void test(unsigned int proc)
 		for (i = 0; i < NPMC; i++)
 			pmc_start[i] = read_pmc(i);
 
-		forp_reset();
 		mtrace_enable_set(1, TESTNAME);
 		shared->run = 1;
 	} else {
@@ -127,8 +110,9 @@ static void test(unsigned int proc)
 	}
 
 	while (shared->run) {
-		XOP(fn);
-		shared->count[proc].v++;
+		seed = seed * 1103515245 + 12345;
+		op_cline(seed & mask);
+		shared->count[core].v++;
 	}
 }
 
@@ -138,24 +122,12 @@ static void initshared(void)
 		      MAP_SHARED|MAP_ANONYMOUS, 0, 0);
 	if (shared == MAP_FAILED)
 		die("mmap failed");
-}
 
-static void initfile(void)
-{
-	unsigned int i;
-	char buf[128];
-	int fd;
-
-	for (i = 0; i < nprocs; i++) {
-		snprintf(buf, sizeof(buf), "%s.%d", the_file, i);
-		setaffinity(i % ncores);
-		fd = creat(buf, S_IRUSR|S_IWUSR);
-		if (fd < 0)
-			edie("creat");
-
-		if (close_fd)
-			close(fd);
-	}
+	shared->buffer = mmap(0, nclines * 64, PROT_READ|PROT_WRITE, 
+			      MAP_SHARED|MAP_ANONYMOUS, 0, 0);
+	if (shared->buffer == MAP_FAILED)
+		die("mmap failed");
+	memset((void *)shared->buffer, 0, nclines * 64);
 }
 
 int main(int ac, char **av)
@@ -163,20 +135,19 @@ int main(int ac, char **av)
 	unsigned int i;
 
 	if (ac < 4)
-		die("usage: %s time nprocs base-filename [close]", av[0]);
+		die("usage: %s time nun-cores kbytes", av[0]);
 
 	the_time = atoi(av[1]);
-	nprocs = atoi(av[2]);
-	the_file = av[3];
-	ncores = sysconf(_SC_NPROCESSORS_CONF);
+	ncores = atoi(av[2]);
+	nclines = (atoi(av[3]) * 1024) / 64;
+	max_ndx = (nclines * 64) / sizeof(*shared->buffer);
 
-	if (ac > 4)
-		close_fd = atoi(av[4]);
+	if (max_ndx & (max_ndx - 1))
+		die("max_ndx %u not a power of 2", max_ndx);
 
 	initshared();
-	initfile();
 
-	for (i = 1; i < nprocs; i++) {
+	for (i = 1; i < ncores; i++) {
 		pid_t p;
 
 		p = fork();
