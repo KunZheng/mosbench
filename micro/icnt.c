@@ -31,6 +31,7 @@ static unsigned int ncores;
 static unsigned int nclines;
 static unsigned int the_time;
 static unsigned int max_ndx;
+static unsigned int distribute_mem;
 
 static uint64_t pmc_start[NPMC];
 static uint64_t pmc_stop[NPMC];
@@ -118,29 +119,41 @@ static void test(unsigned int core)
 
 static void initshared(void)
 {
+	int atomics_per_page;
+	int natomics;
+	int i;
+
 	shared = mmap(0, sizeof(*shared), PROT_READ|PROT_WRITE, 
 		      MAP_SHARED|MAP_ANONYMOUS, 0, 0);
 	if (shared == MAP_FAILED)
 		die("mmap failed");
-
 	shared->buffer = mmap(0, nclines * 64, PROT_READ|PROT_WRITE, 
 			      MAP_SHARED|MAP_ANONYMOUS, 0, 0);
 	if (shared->buffer == MAP_FAILED)
 		die("mmap failed");
-	memset((void *)shared->buffer, 0, nclines * 64);
+
+	if (distribute_mem) {
+		natomics = (nclines * 64) / sizeof(*shared->buffer);
+		atomics_per_page = PAGE_SIZE / sizeof(*shared->buffer);
+		for (i = 0; i < natomics; i += atomics_per_page)
+			memset_on(i % ncores, &shared->buffer[i], 0, PAGE_SIZE);
+	} else {
+		memset_on(0, shared->buffer, 0, nclines * 64);
+	}
 }
 
 int main(int ac, char **av)
 {
 	unsigned int i;
 
-	if (ac < 4)
-		die("usage: %s time nun-cores kbytes", av[0]);
+	if (ac < 5)
+		die("usage: %s time num-cores kbytes distribute-kbytes", av[0]);
 
 	the_time = atoi(av[1]);
 	ncores = atoi(av[2]);
 	nclines = (atoi(av[3]) * 1024) / 64;
 	max_ndx = (nclines * 64) / sizeof(*shared->buffer);
+	distribute_mem = atoi(av[4]);
 
 	if (max_ndx & (max_ndx - 1))
 		die("max_ndx %u not a power of 2", max_ndx);
