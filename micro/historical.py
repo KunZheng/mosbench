@@ -7,13 +7,13 @@ import os
 
 START_CORE    = 0
 STOP_CORE     = 0
-BENCHMARK     = None
 DURATION      = 2
-DATA_FILE     = None
 DELAY         = 0
 NUM_RUNS      = 3
+DEBUG         = False
 
 #VERSIONS      = [ 37, 36, 35, 34, 33, 32, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20 ]
+VERSIONS      = [ 29, 28, 27, 26, 25 ]
 
 BASE_FILENAME = '/root/tmp/foo'
 
@@ -41,9 +41,11 @@ class FopsDir:
     def get_name(self):
         return 'fops-dir'
 
+BENCHMARKS    = [ FopsDir() ]
+
 def usage(argv):
     print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration 
-  -delay delay] 
+  -delay delay -debug debug] 
     'start' is starting core count
     'stop' is ending core count
     'duration' is the duration of each run
@@ -70,11 +72,16 @@ def parse_args(argv):
         global DELAY
         DELAY = int(delay)
 
+    def debug_handler(debug):
+        global DEBUG
+        DEBUG = bool(debug)
+
     handler = {
         '-start'     : start_handler,
         '-stop'      : stop_handler,
         '-duration'  : duration_handler,
-        '-delay'     : delay_handler
+        '-delay'     : delay_handler,
+        '-debug'     : debug_handler
     }
 
     for i in range(0, len(args), 2):
@@ -90,9 +97,6 @@ def parse_args(argv):
     if STOP_CORE == 0:
         print "Specify number of CPUs on command line"
         usage()
-
-    global BENCHMARK
-    BENCHMARK = FopsDir()
 
 def setup(argv):
     pass
@@ -154,6 +158,41 @@ This round of experiments should complete in about %u minutes.
     p = subprocess.Popen(['sudo', 'sh', '-c', 'echo -ne "%s" > /etc/motd' % msg])
     p.wait()
 
+def do_one(benchmark, dataLog):
+    dataLog.write('# %s\n' % benchmark.get_name())
+    dataLog.write('# %s %s %s %s %s\n' % os.uname())
+    dataLog.write('# cpu\t\tthroughput\tmin scale\n')
+
+    maxBase = 0
+    maxTp = (0, 0)
+    maxScale = (0, 0)
+    for c in range(1, STOP_CORE + 1):
+        tp = 0
+        for x in range(0, NUM_RUNS):
+            t = benchmark.run(c)
+            if t > tp:
+                tp = t
+
+        if c == 1:
+            maxBase = tp
+        scale = tp / maxBase
+        dataLog.write('%u\t%f\t%f\n' % (c, tp, scale))
+        if tp > maxTp[1]:
+            maxTp = (c, tp)
+        if scale > maxScale[1]:
+            maxScale = (c, scale)
+        print 'historical: %s %u / %u -- %f %f\r\n' % (benchmark.get_name(), 
+                                                       c, STOP_CORE, tp, scale),
+
+    dataLog.write('\n')
+    dataLog.write('# %s-max-tp\n' % benchmark.get_name())    
+    dataLog.write('%u\t%f\n' % maxTp)    
+
+    dataLog.write('\n')
+    dataLog.write('# %s-max-scale\n' % benchmark.get_name())    
+    dataLog.write('%u\t%f\n' % maxScale)    
+    dataLog.close()
+
 def resume(force = False):
     name = os.uname()[2]
 
@@ -164,51 +203,23 @@ def resume(force = False):
     m = re.search('\d+\.\d+\.(\d+)\-.*', name)
     version = int(m.group(1))
 
-    if not bench_kernel(version):
+    if not force and not bench_kernel(version):
         print 'Not a bench version'
         return
 
-    fixup_motd(version)
+    if not force:
+        fixup_motd(version)
 
-    DATA_FILE = open('historical-results/%s.data' % name, 'w+')
-    DATA_FILE.write('# %s\n' % BENCHMARK.get_name())
-    DATA_FILE.write('# %s %s %s %s %s\n' % os.uname())
-    DATA_FILE.write('# cpu\t\tthroughput\tmin scale\n')
+    dataLog = open('historical-results/%s.data' % name, 'w+')
+    for benchmark in BENCHMARKS:
+        do_one(benchmark, dataLog)
 
-    maxBase = 0
-    maxTp = (0, 0)
-    maxScale = (0, 0)
-    for c in range(1, STOP_CORE + 1):
-        tp = 0
-        for x in range(0, NUM_RUNS):
-            t = BENCHMARK.run(c)
-            if t > tp:
-                tp = t
-
-        if c == 1:
-            maxBase = tp
-        scale = tp / maxBase
-        DATA_FILE.write('%u\t%f\t%f\n' % (c, tp, scale))
-        if tp > maxTp[1]:
-            maxTp = (c, tp)
-        if scale > maxScale[1]:
-            maxScale = (c, scale)
-        print 'historical: %u / %u -- %f %f\r\n' % (c, STOP_CORE, tp, scale),
-
-    DATA_FILE.write('\n')
-    DATA_FILE.write('# %s-max-tp\n' % BENCHMARK.get_name())    
-    DATA_FILE.write('%u\t%f\n' % maxTp)    
-
-    DATA_FILE.write('\n')
-    DATA_FILE.write('# %s-max-scale\n' % BENCHMARK.get_name())    
-    DATA_FILE.write('%u\t%f\n' % maxScale)    
-    DATA_FILE.close()
-
-    next = next_kernel(version)
-    if next:
-        reboot('2.6.%u-sbw-historical' % (next))
-    else:
-        reboot_default()
+    if not force:
+        next = next_kernel(version)
+        if next:
+            reboot('2.6.%u-sbw-historical' % (next))
+        else:
+            reboot_default()
 
 def main(argv=None):
     if argv is None:
@@ -219,7 +230,7 @@ def main(argv=None):
         setup(argv)
 
     time.sleep(DELAY)
-    resume()
+    resume(force = DEBUG)
 
 if __name__ == '__main__':
     sys.exit(main())
