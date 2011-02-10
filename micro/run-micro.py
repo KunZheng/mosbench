@@ -55,7 +55,8 @@ def parse_args(argv):
 
     benchmarks = {
         'fops-dir':    micros.FopsDir,
-        'memclone':    micros.Memclone
+        'memclone':    micros.Memclone,
+        'populate':    micros.Populate
     }
 
     global BENCHMARK
@@ -76,7 +77,12 @@ def main(argv=None):
     print '# %s %s %s %s %s' % os.uname()
     print '# cpu\t\tthroughput\tmin scale\tmax scale'
     for c in range(1, STOP_CORE + 1):
-        tp = BENCHMARK.run(c, DURATION)
+        tp = 0
+        for x in range(0, 3):
+            t = BENCHMARK.run(c, DURATION)
+            if t > tp:
+                tp = t
+
         if c == 1:
             maxBase = tp
             minScale = tp / maxBase

@@ -1,0 +1,176 @@
+/*
+ * Create threads, call mmap(MAP_POPULATE) and munmap
+ */
+
+#define TESTNAME "fops_dir"
+
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/syscall.h>
+
+#include <stdio.h>
+#include <stdint.h>
+#include <stdlib.h>
+
+#include <unistd.h>
+#include <signal.h>
+#include <fcntl.h>
+
+#include <pthread.h>
+
+#include "bench.h"
+
+#define NPMC 3
+
+#define MAX_PROC 256
+
+static uint64_t start;
+static uint64_t nbytes;
+
+static unsigned int ncores;
+static unsigned int the_time;
+
+static uint64_t pmc_start[NPMC];
+static uint64_t pmc_stop[NPMC];
+
+static struct {
+	union __attribute__((__aligned__(64))){
+		volatile uint64_t v;
+		char pad[64];
+	} count[MAX_PROC];
+	volatile int run;
+} *shared;
+
+static inline void xopen(const char *fn)
+{
+	int fd = open(fn, O_RDONLY);
+	if (fd < 0)
+		edie("open");
+	close(fd);
+}
+
+static inline void xstat(const char *fn)
+{
+	struct stat st;
+	if (stat(fn, &st))
+		edie("stat");
+}
+
+static inline void xgettid(const char *fn)
+{
+	syscall(SYS_gettid);
+}
+
+static void sighandler(int x)
+{
+	float sec, rate, one;
+	uint64_t stop, tot;
+	unsigned int i;
+
+	for (i = 0; i < NPMC; i++)
+		pmc_stop[i] = read_pmc(i);
+
+	stop = usec();
+	shared->run = 0;
+
+	tot = 0;
+	for (i = 0; i < ncores; i++)
+		tot += shared->count[i].v;
+
+	sec = (float)(stop - start) / 1000000;
+	rate = (float)tot / sec;
+	one = (float)(stop - start) / (float)tot;
+
+	printf("rate: %f per sec\n", rate);
+	printf("lat: %f usec\n", one);
+
+	for (i = 0; i < NPMC; i++) {
+		rate = (float)(pmc_stop[i] - pmc_start[i]) / 
+			(float) shared->count[0].v;
+		printf("pmc(%u): %f per op\n", i, rate);
+	}
+}
+
+static void test(unsigned int core)
+{
+	setaffinity(core % ncores);
+
+	if (core == 0) {
+		unsigned int i;
+
+		if (signal(SIGALRM, sighandler) == SIG_ERR)
+			die("signal failed\n");
+		alarm(the_time);
+		start = usec();
+
+		for (i = 0; i < NPMC; i++)
+			pmc_start[i] = read_pmc(i);
+
+		shared->run = 1;
+	} else {
+		while (shared->run == 0)
+			__asm __volatile ("pause");
+	}
+
+	while (shared->run) {
+		void *ptr = mmap(0, nbytes, PROT_READ|PROT_WRITE,
+				 MAP_PRIVATE|MAP_ANONYMOUS, 0, 0);
+		if (ptr == MAP_FAILED)
+			edie("mmap");
+		if (munmap(ptr, nbytes) < 0)
+			edie("munmap");
+		shared->count[core].v++;
+	}
+}
+
+static void *worker(void *x)
+{
+	test((int)(intptr_t)x);
+	return NULL;
+}
+
+static void initshared(void)
+{
+	shared = mmap(0, sizeof(*shared), PROT_READ|PROT_WRITE, 
+		      MAP_SHARED|MAP_ANONYMOUS, 0, 0);
+	if (shared == MAP_FAILED)
+		die("mmap failed");
+}
+
+int main(int ac, char **av)
+{
+	int use_threads;
+	unsigned int i;
+	if (ac < 4)
+		die("usage: %s time ncores num-mbytes use-threads", av[0]);
+
+	the_time = atoi(av[1]);
+	ncores = atoi(av[2]);
+	nbytes = atoi(av[3]) * 1024 * 1024;
+	use_threads = atoi(av[4]);
+
+	initshared();
+
+	for (i = 1; i < ncores; i++) {
+		if (use_threads) {
+			pthread_t th;
+			if (pthread_create(&th, NULL, worker, (void *)(intptr_t)i) < 0)
+				edie("pthread_create");
+		} else {
+			pid_t p;
+			p = fork();
+			if (p < 0)
+				edie("fork");
+			else if (p == 0) {
+				test(i);
+				return 0;
+			}
+		}
+	}
+
+	sleep(1);
+	test(0);
+
+	return 0;
+}

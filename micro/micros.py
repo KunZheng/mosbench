@@ -51,3 +51,28 @@ class Memclone:
             return 'memclone-threads'
         else:
             return 'memclone-processes'
+
+class Populate:
+    useThreads = 0
+    mbytes = 200
+
+    def __init__(self):
+        pass
+
+    def run(self, ncores, duration):
+        ghz = get_cpu_ghz()
+        p = subprocess.Popen(["o/populate", str(duration), str(ncores), 
+                              str(self.mbytes), str(self.useThreads)],
+                             stdout=subprocess.PIPE)
+        p.wait()
+        if p.returncode:
+            raise Exception('Populate.run failed: %u' % p.returncode)
+        l = p.stdout.readline().strip()
+        m = re.search('rate: (\d+\.\d+) per sec', l)
+        return float(m.group(1))
+
+    def get_name(self):
+        if self.useThreads:
+            return 'populate-threads'
+        else:
+            return 'populate-processes'
