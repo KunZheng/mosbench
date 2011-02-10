@@ -32,6 +32,9 @@ class FopsDir:
     def get_min_base(self):
         return self.run(2) / float(2)
 
+    def get_name(self):
+        return 'fops-dir'
+
 def usage(argv):
     print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration ] 
     'start' is starting core count
@@ -93,6 +96,7 @@ def main(argv=None):
     minBase = BENCHMARK.get_min_base()
     maxBase = BENCHMARK.get_max_base()
 
+    print '# %s' % BENCHMARK.get_name()
     print '# %s %s %s %s %s' % os.uname()
     print '# min base = %f max base = %f' % (minBase, maxBase)
     print '# cpu\t\tthroughput\tmin scale\tmax scale'
