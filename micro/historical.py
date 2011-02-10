@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import subprocess
+import micros
 import time
 import sys
 import re
@@ -12,36 +13,12 @@ DELAY         = 0
 NUM_RUNS      = 3
 DEBUG         = False
 
-#VERSIONS      = [ 37, 36, 35, 34, 33, 32, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20 ]
+#VERSIONS      = [ 37, 36, 35, 34, 33, 32, 30, 29, 28, 27, 26, 25 ]
 VERSIONS      = [ 29, 28, 27, 26, 25 ]
 
 BASE_FILENAME = '/root/tmp/foo'
 
-class FopsDir:
-    def __init__(self):
-        pass
-
-    def run(self, ncores, duration = DURATION):
-        p = subprocess.Popen(["o/fops-dir", str(duration), str(ncores), 
-                              BASE_FILENAME, '0'],
-                             stdout=subprocess.PIPE)
-        p.wait()
-        if p.returncode:
-            raise Exception('FopsDir.run failed: %u' % p.returncode)
-        l = p.stdout.readline().strip()
-        m = re.search('rate: (\d+\.\d+) per sec', l)
-        return float(m.group(1))
-
-    def get_max_base(self):
-        return self.run(1)
-
-    def get_min_base(self):
-        return self.run(2) / float(2)
-
-    def get_name(self):
-        return 'fops-dir'
-
-BENCHMARKS    = [ FopsDir() ]
+BENCHMARKS    = [ micros.FopsDir() ]
 
 def usage(argv):
     print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration 
@@ -169,7 +146,7 @@ def do_one(benchmark, dataLog):
     for c in range(1, STOP_CORE + 1):
         tp = 0
         for x in range(0, NUM_RUNS):
-            t = benchmark.run(c)
+            t = benchmark.run(c, DURATION)
             if t > tp:
                 tp = t
 

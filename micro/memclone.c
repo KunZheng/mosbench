@@ -23,6 +23,8 @@ static int nbytes;
 static int ncores;
 static unsigned int page_size;
 
+static uint64_t start;
+
 static void *
 worker(void *x)
 {
@@ -41,9 +43,11 @@ worker(void *x)
 	if (i)
 		while (!sync_state->start)
 			nop_pause();
-	else
+	else {
+		start = usec();
 		sync_state->start = 1;
-	
+	}	
+
 	s = read_tsc();
 	for (; buf != end; buf += page_size)
 		*buf = 1;
@@ -56,6 +60,9 @@ static void waitup(void)
 {
 	uint64_t ave_pf, max_pf;
 	uint64_t tot, max;
+	uint64_t size;
+	uint64_t end;
+	float tp, sec;
 	int i;
 
 	tot = 0;
@@ -69,6 +76,13 @@ static void waitup(void)
 			max = sync_state->cpu[i].cycle;
 	}
 
+	end = usec();
+
+	size = ((uint64_t)ncores * (uint64_t)nbytes) / (uint64_t)page_size;
+	sec = (float)(end - start) / 1000000.0;
+	tp = ((float)size) / sec;
+
+	printf("rate: %f per sec\n", tp);
 	ave_pf = (tot / ncores) / (nbytes / page_size);
 	max_pf = max / (nbytes / page_size);
 	printf("ave cycles/pf %"PRIu64", max cycles/pf %"PRIu64"\n", 

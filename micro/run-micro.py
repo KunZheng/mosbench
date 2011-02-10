@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import subprocess
+import micros
 import sys
 import re
 import os
@@ -8,32 +9,6 @@ START_CORE    = 0
 STOP_CORE     = 0
 BENCHMARK     = None
 DURATION      = 2
-
-BASE_FILENAME = '/root/tmp/foo'
-
-class FopsDir:
-    def __init__(self):
-        pass
-
-    def run(self, ncores, duration = DURATION):
-        p = subprocess.Popen(["o/fops-dir", str(duration), str(ncores), 
-                              BASE_FILENAME, '0'],
-                             stdout=subprocess.PIPE)
-        p.wait()
-        if p.returncode:
-            raise Exception('FopsDir.run failed: %u' % p.returncode)
-        l = p.stdout.readline().strip()
-        m = re.search('rate: (\d+\.\d+) per sec', l)
-        return float(m.group(1))
-
-    def get_max_base(self):
-        return self.run(1)
-
-    def get_min_base(self):
-        return self.run(2) / float(2)
-
-    def get_name(self):
-        return 'fops-dir'
 
 def usage(argv):
     print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration ] 
@@ -79,7 +54,8 @@ def parse_args(argv):
         usage()
 
     benchmarks = {
-        'fops-dir':    FopsDir
+        'fops-dir':    micros.FopsDir,
+        'memclone':    micros.Memclone
     }
 
     global BENCHMARK
@@ -93,15 +69,22 @@ def main(argv=None):
 
     parse_args(argv)
 
-    minBase = BENCHMARK.get_min_base()
-    maxBase = BENCHMARK.get_max_base()
+    maxBase = 0
+    minBase = 0
 
     print '# %s' % BENCHMARK.get_name()
     print '# %s %s %s %s %s' % os.uname()
-    print '# min base = %f max base = %f' % (minBase, maxBase)
     print '# cpu\t\tthroughput\tmin scale\tmax scale'
     for c in range(1, STOP_CORE + 1):
-        tp = BENCHMARK.run(c)
+        tp = BENCHMARK.run(c, DURATION)
+        if c == 1:
+            maxBase = tp
+            minScale = tp / maxBase
+            print '%u\t%f\t%f' % (c, tp, minScale)
+            continue
+        if c == 2:
+            minBase = tp / 2
+
         minScale = tp / maxBase
         maxScale = tp / minBase
         print '%u\t%f\t%f\t%f' % (c, tp, minScale, maxScale)
