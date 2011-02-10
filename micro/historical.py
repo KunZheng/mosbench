@@ -13,8 +13,7 @@ DATA_FILE     = None
 DELAY         = 0
 NUM_RUNS      = 3
 
-START_VERSION  = 37
-FINAL_VERSION  = 37
+#VERSIONS      = [ 37, 36, 35, 34, 33, 32, 30, 29, 28, 27, 26, 25, 24, 23, 22, 21, 20 ]
 
 BASE_FILENAME = '/root/tmp/foo'
 
@@ -118,23 +117,40 @@ def reboot_default():
     print 'Rebooting into default...'
     exit(0)
 
+def find_kernel_index(version):
+    i = 0
+    for v in VERSIONS:
+        if v == version:
+            return i
+        i += 1
+    return None
+
 def bench_kernel(version):
-    pass
+    if find_kernel_index(version) != None:
+        return True
+    return False
 
 def next_kernel(version):
-    pass
+    i = find_kernel_index(version)
+    if i != None and len(VERSIONS) > (i + 1):
+        return VERSIONS[i + 1]
+    return None
+
+def num_kernel_remain(version):
+    i = find_kernel_index(version)
+    return len(VERSIONS) - i
 
 def fixup_motd(version):
     msg = '''
 PLEASE LOGOUT
 
-Silas is running experiments on kernels %u to %u.
+Silas is running experiments on old kernels: %s.
 
 This involves frequent reboots.
 
 This round of experiments should complete in about %u minutes.
 
-''' % (START_VERSION, FINAL_VERSION, 5 * (1 + version - FINAL_VERSION))
+''' % (VERSIONS.__str__(), 5 * num_kernel_remain(version))
     p = subprocess.Popen(['sudo', 'sh', '-c', 'echo -ne "%s" > /etc/motd' % msg])
     p.wait()
 
@@ -148,7 +164,8 @@ def resume(force = False):
     m = re.search('\d+\.\d+\.(\d+)\-.*', name)
     version = int(m.group(1))
 
-    if version < FINAL_VERSION or version > START_VERSION:
+    if not bench_kernel(version):
+        print 'Not a bench version'
         return
 
     fixup_motd(version)
@@ -187,8 +204,9 @@ def resume(force = False):
     DATA_FILE.write('%u\t%f\n' % maxScale)    
     DATA_FILE.close()
 
-    if version != FINAL_VERSION:
-        reboot('2.6.%u-sbw-historical' % (version - 1))
+    next = next_kernel(version)
+    if next:
+        reboot('2.6.%u-sbw-historical' % (next))
     else:
         reboot_default()
 
