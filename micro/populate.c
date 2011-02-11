@@ -20,6 +20,7 @@
 #include <pthread.h>
 
 #include "bench.h"
+#include "gemaphore.h"
 
 #define NPMC 3
 
@@ -40,6 +41,7 @@ static struct {
 		char pad[64];
 	} count[MAX_PROC];
 	volatile int run;
+	struct gemaphore gema;
 } *shared;
 
 static inline void xopen(const char *fn)
@@ -98,6 +100,8 @@ static void test(unsigned int core)
 
 	if (core == 0) {
 		unsigned int i;
+		
+		gemaphore_p(&shared->gema);
 
 		if (signal(SIGALRM, sighandler) == SIG_ERR)
 			die("signal failed\n");
@@ -109,6 +113,7 @@ static void test(unsigned int core)
 
 		shared->run = 1;
 	} else {
+		gemaphore_v(&shared->gema);
 		while (shared->run == 0)
 			__asm __volatile ("pause");
 	}
@@ -136,6 +141,7 @@ static void initshared(void)
 		      MAP_SHARED|MAP_ANONYMOUS, 0, 0);
 	if (shared == MAP_FAILED)
 		die("mmap failed");
+	gemaphore_init(&shared->gema, ncores - 1);
 }
 
 int main(int ac, char **av)
@@ -169,8 +175,6 @@ int main(int ac, char **av)
 		}
 	}
 
-	sleep(1);
 	test(0);
-
 	return 0;
 }
