@@ -11,7 +11,7 @@ import os
 
 START_CORE    = 0
 STOP_CORE     = 0
-DURATION      = 2
+DURATION      = 5
 DELAY         = 0
 NUM_RUNS      = 3
 DEBUG         = False
