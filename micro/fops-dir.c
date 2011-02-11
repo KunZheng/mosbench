@@ -20,6 +20,7 @@
 #include "bench.h"
 #include "support/mtrace.h"
 #include "forp.h"
+#include "gemaphore.h"
 
 #define NPMC 3
 
@@ -44,6 +45,7 @@ static struct {
 		char pad[64];
 	} count[MAX_PROC];
 	volatile int run;
+	struct gemaphore gema;
 } *shared;
 
 static inline void xopen(const char *fn)
@@ -110,6 +112,8 @@ static void test(unsigned int proc)
 	if (proc == 0) {
 		unsigned int i;
 
+		gemaphore_p(&shared->gema);
+
 		if (signal(SIGALRM, sighandler) == SIG_ERR)
 			die("signal failed\n");
 		alarm(the_time);
@@ -122,8 +126,9 @@ static void test(unsigned int proc)
 		mtrace_enable_set(1, TESTNAME);
 		shared->run = 1;
 	} else {
+		gemaphore_v(&shared->gema);
 		while (shared->run == 0)
-			__asm __volatile ("pause");
+			nop_pause();
 	}
 
 	while (shared->run) {
@@ -138,6 +143,7 @@ static void initshared(void)
 		      MAP_SHARED|MAP_ANONYMOUS, 0, 0);
 	if (shared == MAP_FAILED)
 		die("mmap failed");
+	gemaphore_init(&shared->gema, nprocs - 1);
 }
 
 static void initfile(void)
@@ -188,8 +194,6 @@ int main(int ac, char **av)
 		}
 	}
 
-	sleep(1);
 	test(0);
-
 	return 0;
 }
