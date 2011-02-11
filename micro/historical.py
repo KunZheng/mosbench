@@ -1,6 +1,9 @@
 #!/usr/bin/python
 import subprocess
+import results
+import pickle
 import micros
+import errno
 import time
 import sys
 import re
@@ -12,12 +15,10 @@ DURATION      = 2
 DELAY         = 0
 NUM_RUNS      = 3
 DEBUG         = False
-
+PICKLE        = 'historical-results/pickle'
 #VERSIONS      = [ 37, 36, 35, 34, 33, 32, 30, 29, 28, 27, 26, 25 ]
-VERSIONS      = [ 29, 28, 27, 26, 25 ]
 
-BASE_FILENAME = '/root/tmp/foo'
-
+VERSIONS      = [ 37, 36 ]
 BENCHMARKS    = [ micros.FopsDir() ]
 
 def usage(argv):
@@ -131,11 +132,11 @@ This involves frequent reboots.
 
 This round of experiments should complete in about %u minutes.
 
-''' % (VERSIONS.__str__(), 5 * num_kernel_remain(version))
+''' % (VERSIONS.__str__(), 5 * num_kernel_remain(version) * len(BENCHMARKS))
     p = subprocess.Popen(['sudo', 'sh', '-c', 'echo -ne "%s" > /etc/motd' % msg])
     p.wait()
 
-def do_one(benchmark, dataLog):
+def do_one(benchmark, dataLog, version, benchResults):
     dataLog.write('# %s\n' % benchmark.get_name())
     dataLog.write('# %s %s %s %s %s\n' % os.uname())
     dataLog.write('# cpu\t\tthroughput\tmin scale\n')
@@ -161,6 +162,9 @@ def do_one(benchmark, dataLog):
         print 'historical: %s %u / %u -- %f %f\r\n' % (benchmark.get_name(), 
                                                        c, STOP_CORE, tp, scale),
 
+    benchResults.get_table('max-throughput').add_row([version, maxTp[0], maxTp[1]])
+    benchResults.get_table('max-scale').add_row([version, maxScale[0], maxScale[1]])
+
     dataLog.write('\n')
     dataLog.write('# %s-max-tp\n' % benchmark.get_name())    
     dataLog.write('%u\t%f\n' % maxTp)    
@@ -172,6 +176,7 @@ def do_one(benchmark, dataLog):
 
 def resume(force = False):
     name = os.uname()[2]
+    allResults = None
 
     if not force and not name.endswith('historical'):
         print 'Not a historical kernel'
@@ -186,11 +191,20 @@ def resume(force = False):
 
     if not force:
         fixup_motd(version)
+    allResults = results.open_results(PICKLE)
 
     dataLog = open('historical-results/%s.data' % name, 'w+')
     for benchmark in BENCHMARKS:
-        do_one(benchmark, dataLog)
+        if not benchmark.get_name() in allResults:
+            maxTp = results.ResultTable('max-throughput', ['version', 'cores', 'throughput'])
+            maxScale = results.ResultTable('max-scale', ['version', 'cores', 'scale'])
+            result = results.Results(benchmark.get_name())
+            result.add_table(maxTp)
+            result.add_table(maxScale)
+            allResults[benchmark.get_name()] = result
+        do_one(benchmark, dataLog, version, allResults[benchmark.get_name()])
 
+    results.save_results(PICKLE, allResults)
     if not force:
         next = next_kernel(version)
         if next:
