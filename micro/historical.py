@@ -16,10 +16,9 @@ DELAY         = 0
 NUM_RUNS      = 3
 DEBUG         = False
 PICKLE        = 'historical-results/pickle'
-#VERSIONS      = [ 37, 36, 35, 34, 33, 32, 30, 29, 28, 27, 26, 25 ]
-
-VERSIONS      = [ 37, 36 ]
-BENCHMARKS    = [ micros.FopsDir() ]
+VERSIONS      = [ 37, 36, 35, 34, 33, 32, 30, 29, 28, 27, 26, 25 ]
+#VERSIONS      = [ 37, 36 ]
+BENCHMARKS    = [ micros.Memclone(), micros.Populate() ]
 
 def usage(argv):
     print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration 
@@ -28,6 +27,7 @@ def usage(argv):
     'stop' is ending core count
     'duration' is the duration of each run
     'delay' is the number of seconds to delay before starting
+    'debug' is True to enable debugging
 ''' % argv[0],
     exit(1)
 
@@ -172,7 +172,6 @@ def do_one(benchmark, dataLog, version, benchResults):
     dataLog.write('\n')
     dataLog.write('# %s-max-scale\n' % benchmark.get_name())    
     dataLog.write('%u\t%f\n' % maxScale)    
-    dataLog.close()
 
 def resume(force = False):
     name = os.uname()[2]
@@ -203,6 +202,7 @@ def resume(force = False):
             result.add_table(maxScale)
             allResults[benchmark.get_name()] = result
         do_one(benchmark, dataLog, version, allResults[benchmark.get_name()])
+    dataLog.close()
 
     results.save_results(PICKLE, allResults)
     if not force:
