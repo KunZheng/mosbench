@@ -67,10 +67,17 @@ static inline void xgettid(const char *fn)
 
 static void sighandler(int x)
 {
+	struct mtrace_appdata_entry entry;
 	float sec, rate, one;
 	uint64_t stop, tot;
 	unsigned int i;
 
+	tot = 0;
+	for (i = 0; i < nprocs; i++)
+		tot += shared->count[i].v;
+
+	entry.u64 = tot;
+	mtrace_appdata_register(&entry);
 	mtrace_enable_set(0, TESTNAME);
 
 	for (i = 0; i < NPMC; i++)
