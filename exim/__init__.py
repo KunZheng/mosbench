@@ -6,6 +6,8 @@ import os, signal, re
 
 __all__ = []
 
+CORES = file("/proc/cpuinfo").read().count("processor\t")
+
 __all__.append("EximDaemon")
 class EximDaemon(Task):
     __info__ = ["host", "eximPath", "eximBuild", "mailDir", "spoolDir", "port", "numInstances"]
@@ -35,7 +37,8 @@ class EximDaemon(Task):
 
         # Start Exim
         proc  = self.host.r.run(
-            [os.path.join(self.eximPath, self.__iPath(self.eximBuild, i), "bin", "exim"),
+            ["numactl", "-C", str(i % CORES),
+             os.path.join(self.eximPath, self.__iPath(self.eximBuild, i), "bin", "exim"),
              "-bdf", "-oX", str(self.port + i), "-C", config],
             wait = False)
         self.__proc.append(proc)
