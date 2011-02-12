@@ -16,8 +16,8 @@ DELAY         = 0
 NUM_RUNS      = 3
 DEBUG         = False
 PICKLE        = 'historical-results/pickle'
-VERSIONS      = [ 37, 36, 35, 34, 33, 32, 30, 29, 28, 27, 26, 25 ]
-#VERSIONS      = [ 37, 36 ]
+#VERSIONS      = [ 37, 36, 35, 34, 33, 32, 30, 29, 28, 27, 26, 25 ]
+VERSIONS      = []
 BENCHMARKS    = [ micros.Memclone(), micros.Populate() ]
 
 def usage(argv):
