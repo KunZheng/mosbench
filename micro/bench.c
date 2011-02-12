@@ -1,5 +1,6 @@
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/mman.h>
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -53,8 +54,27 @@ void setaffinity(int c)
 	CPU_ZERO(&cpuset);
 	CPU_SET(c, &cpuset);
 	if (sched_setaffinity(0, sizeof(cpuset), &cpuset) < 0)
-		edie("setaffinity, sched_setaffinity failed");
+		edie("setaffinity: sched_setaffinity");
 #endif
+}
+
+void memset_on(int core, void *s, int c, size_t n)
+{
+	cpu_set_t tmp;
+	cpu_set_t org;
+
+	if (sched_getaffinity(0, sizeof(org), &org) < 0)
+		edie("memset_on: sched_getaffinity");
+
+	CPU_ZERO(&tmp);
+	CPU_SET(core, &tmp);
+	if (sched_setaffinity(0, sizeof(tmp), &tmp) < 0)
+		edie("memset_on: sched_setaffinity(tmp)");
+
+	memset(s, c, n);
+
+	if (sched_setaffinity(0, sizeof(org), &org) < 0)
+		edie("memset_on: sched_setaffinity(org)");
 }
 
 uint64_t usec(void)

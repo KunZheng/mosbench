@@ -86,7 +86,8 @@ exim = mk(benchmark = exim.runner, nonConst = True)
 
 exim *= mk(eximBuild = "exim-mod")
 exim *= mk(eximPort = 2526)
-exim *= mk(clients = 4)
+exim *= mk(clients = 8)
+exim *= mk(numInstances = 1)
 
 ##################################################################
 # memcached

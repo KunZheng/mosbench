@@ -1,5 +1,5 @@
 /*
- * Operate (XOP) on per-process files in the same directory.
+ * Create threads, call mmap(MAP_POPULATE) and munmap
  */
 
 #define TESTNAME "fops_dir"
@@ -17,24 +17,20 @@
 #include <signal.h>
 #include <fcntl.h>
 
+#include <pthread.h>
+
 #include "bench.h"
-#include "support/mtrace.h"
-#include "forp.h"
 #include "gemaphore.h"
 
 #define NPMC 3
 
 #define MAX_PROC 256
 
-#define XOP xopen
-
 static uint64_t start;
+static uint64_t nbytes;
 
 static unsigned int ncores;
-static unsigned int nprocs;
 static unsigned int the_time;
-static unsigned int close_fd;
-static char *the_file;
 
 static uint64_t pmc_start[NPMC];
 static uint64_t pmc_stop[NPMC];
@@ -70,20 +66,9 @@ static inline void xgettid(const char *fn)
 
 static void sighandler(int x)
 {
-	struct mtrace_appdata_entry entry;
 	float sec, rate, one;
 	uint64_t stop, tot;
 	unsigned int i;
-
-	tot = 0;
-	for (i = 0; i < nprocs; i++)
-		tot += shared->count[i].v;
-
-	entry.u64 = tot;
-	mtrace_appdata_register(&entry);
-
-	forp_stop();
-	mtrace_enable_set(0, TESTNAME);
 
 	for (i = 0; i < NPMC; i++)
 		pmc_stop[i] = read_pmc(i);
@@ -92,7 +77,7 @@ static void sighandler(int x)
 	shared->run = 0;
 
 	tot = 0;
-	for (i = 0; i < nprocs; i++)
+	for (i = 0; i < ncores; i++)
 		tot += shared->count[i].v;
 
 	sec = (float)(stop - start) / 1000000;
@@ -109,17 +94,13 @@ static void sighandler(int x)
 	}
 }
 
-static void test(unsigned int proc)
+static void test(unsigned int core)
 {
-	char fn[128];
-	
-	setaffinity(proc % ncores);
+	setaffinity(core % ncores);
 
-	snprintf(fn, sizeof(fn), "%s.%d", the_file, 0);
-
-	if (proc == 0) {
+	if (core == 0) {
 		unsigned int i;
-
+		
 		gemaphore_p(&shared->gema);
 
 		if (signal(SIGALRM, sighandler) == SIG_ERR)
@@ -130,19 +111,28 @@ static void test(unsigned int proc)
 		for (i = 0; i < NPMC; i++)
 			pmc_start[i] = read_pmc(i);
 
-		forp_reset();
-		mtrace_enable_set(1, TESTNAME);
 		shared->run = 1;
 	} else {
 		gemaphore_v(&shared->gema);
 		while (shared->run == 0)
-			nop_pause();
+			__asm __volatile ("pause");
 	}
 
 	while (shared->run) {
-		XOP(fn);
-		shared->count[proc].v++;
+		void *ptr = mmap(0, nbytes, PROT_READ|PROT_WRITE,
+				 MAP_PRIVATE|MAP_ANONYMOUS, 0, 0);
+		if (ptr == MAP_FAILED)
+			edie("mmap");
+		if (munmap(ptr, nbytes) < 0)
+			edie("munmap");
+		shared->count[core].v++;
 	}
+}
+
+static void *worker(void *x)
+{
+	test((int)(intptr_t)x);
+	return NULL;
 }
 
 static void initshared(void)
@@ -151,54 +141,37 @@ static void initshared(void)
 		      MAP_SHARED|MAP_ANONYMOUS, 0, 0);
 	if (shared == MAP_FAILED)
 		die("mmap failed");
-	gemaphore_init(&shared->gema, nprocs - 1);
-}
-
-static void initfile(void)
-{
-	unsigned int i;
-	char buf[128];
-	int fd;
-
-	for (i = 0; i < nprocs; i++) {
-		snprintf(buf, sizeof(buf), "%s.%d", the_file, i);
-		setaffinity(i % ncores);
-		fd = creat(buf, S_IRUSR|S_IWUSR);
-		if (fd < 0)
-			edie("creat");
-
-		if (close_fd)
-			close(fd);
-	}
+	gemaphore_init(&shared->gema, ncores - 1);
 }
 
 int main(int ac, char **av)
 {
+	int use_threads;
 	unsigned int i;
-
 	if (ac < 4)
-		die("usage: %s time nprocs base-filename [close]", av[0]);
+		die("usage: %s time ncores num-mbytes use-threads", av[0]);
 
 	the_time = atoi(av[1]);
-	nprocs = atoi(av[2]);
-	the_file = av[3];
-	ncores = sysconf(_SC_NPROCESSORS_CONF);
-
-	if (ac > 4)
-		close_fd = atoi(av[4]);
+	ncores = atoi(av[2]);
+	nbytes = atoi(av[3]) * 1024 * 1024;
+	use_threads = atoi(av[4]);
 
 	initshared();
-	initfile();
 
-	for (i = 1; i < nprocs; i++) {
-		pid_t p;
-
-		p = fork();
-		if (p < 0)
-			edie("fork");
-		else if (p == 0) {
-			test(i);
-			return 0;
+	for (i = 1; i < ncores; i++) {
+		if (use_threads) {
+			pthread_t th;
+			if (pthread_create(&th, NULL, worker, (void *)(intptr_t)i) < 0)
+				edie("pthread_create");
+		} else {
+			pid_t p;
+			p = fork();
+			if (p < 0)
+				edie("fork");
+			else if (p == 0) {
+				test(i);
+				return 0;
+			}
 		}
 	}
 

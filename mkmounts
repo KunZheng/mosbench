@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/dash
 
 set -e
 
@@ -88,16 +88,20 @@ case $1 in
         for cpu in $CPUS; do
             dotmpfs $BASE/$1/$cpu
         done
-        # Mount/unmount Exim spool directories
-        # intersperse ' ' $ ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z']
-        spools="0 1 2 3 4 5 6 7 8 9 a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z"
-        if [ ! $UNMOUNT ]; then dotmpfs $BASE/$1/spool; fi
-        for spool in $spools; do
-            dotmpfs $BASE/$1/spool/input/$spool
-            # This doesn't make much of a difference
-#            dotmpfs $BASE/$1/spool/msglog/$spool
-        done
-        if [ $UNMOUNT ]; then dotmpfs $BASE/$1/spool; fi
+	instances="0 1 2 3"
+	for instance in $instances; do
+	    spoolbase="spool-$instance"
+	    # Mount/unmount Exim spool directories
+            # intersperse ' ' $ ['0'..'9'] ++ ['a'..'z'] ++ ['A'..'Z']
+            spools="0 1 2 3 4 5 6 7 8 9 a b c d e f g h i j k l m n o p q r s t u v w x y z A B C D E F G H I J K L M N O P Q R S T U V W X Y Z"
+            if [ ! $UNMOUNT ]; then dotmpfs $BASE/$1/$spoolbase; fi
+            for spool in $spools; do
+		dotmpfs $BASE/$1/$spoolbase/input/$spool
+                # This doesn't make much of a difference
+                # dotmpfs $BASE/$1/$spoolbase/msglog/$spool
+            done
+            if [ $UNMOUNT ]; then dotmpfs $BASE/$1/$spoolbase; fi
+	done
         ;;
     tmpfs)
         dotmpfs $BASE/$1

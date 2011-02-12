@@ -21,8 +21,8 @@
 void __noret__ die(const char* errstr, ...);
 void __noret__ edie(const char* errstr, ...);
 
-void setaffinity(int c);
-
+void setaffinity(int core);
+void memset_on(int core, void *s, int c, size_t n);
 uint64_t usec(void);
 
 static inline uint64_t read_tsc(void)

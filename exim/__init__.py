@@ -32,16 +32,26 @@ class EximDaemon(Task):
         self.host.r.run(
             [os.path.join(self.eximPath, "mkconfig"),
              os.path.join(self.eximPath, self.__iPath(self.eximBuild, i)),
-             self.__iPath(self.mailDir, i), self.__iPath(self.spoolDir, i)],
+             self.mailDir + str(i), self.__iPath(self.spoolDir, i)],
             stdout = config)
 
+        self.host.r.run(
+            ["rm", "-f", os.path.join(self.__iPath(self.spoolDir, i), "log", "mainlog")])
+
         # Start Exim
-        proc  = self.host.r.run(
-            ["numactl", "-C", str(i % CORES),
-             os.path.join(self.eximPath, self.__iPath(self.eximBuild, i), "bin", "exim"),
-             "-bdf", "-oX", str(self.port + i), "-C", config],
-            wait = False)
-        self.__proc.append(proc)
+        if self.numInstances > 1:
+            proc  = self.host.r.run(
+                ["numactl", "-C", str(i % CORES),
+                 os.path.join(self.eximPath, self.__iPath(self.eximBuild, i), "bin", "exim"),
+                 "-bdf", "-oX", str(self.port + i), "-C", config],
+                wait = False)
+            self.__proc.append(proc)
+        else:
+            proc  = self.host.r.run(
+                [os.path.join(self.eximPath, self.__iPath(self.eximBuild, i), "bin", "exim"),
+                 "-bdf", "-oX", str(self.port + i), "-C", config],
+                wait = False)
+            self.__proc.append(proc)
 
         waitForLog(self.host, os.path.join(self.__iPath(self.spoolDir, i), "log", "mainlog"),
                    "exim", 5, "listening for SMTP")
@@ -55,6 +65,7 @@ class EximDaemon(Task):
             # Ugh, there's no way to cleanly shut down Exim, so we can't
             # check for a sensible exit code.
             p.kill(signal.SIGTERM)
+        self.__proc = []
 
     def reset(self):
         if len(self.__proc) > 0:
@@ -120,7 +131,7 @@ class EximRunner(object):
         eximPath = os.path.join(cfg.benchRoot, "exim")
         m += SetCPUs(host = host, num = cfg.cores)
         m += EximDaemon(host, eximPath, cfg.eximBuild,
-                        os.path.join(fs.path + "0"),
+                        os.path.join(fs.path),
                         os.path.join(fs.path + "spool"),
                         cfg.eximPort,
                         cfg.numInstances)
