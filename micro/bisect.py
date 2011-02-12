@@ -109,7 +109,8 @@ Silas is running git-bisect to find when a scalability bug was introduced.
 
 This involves frequent reboots.
 
-This round of searching should complete shortly.
+This round of searching should complete shortly.  See '# screen -x tom' on
+hooverdam for more information.
 
 '''
     p = subprocess.Popen(['sudo', 'sh', '-c', 'echo -ne "%s" > /etc/motd' % msg])
@@ -144,17 +145,18 @@ def test_kernel():
                                                                                       maxScale[0], maxScale[1], 
                                                                                       maxTp[0], maxTp[1]),
         if maxTp[1] > MIN_TPUT:
-            print 'good kernel (min tp %f)' % MIN_TPUT
+            print 'good kernel (min tp %f)\r\n' % MIN_TPUT,
             return True
     
-    print 'bad kernel (min tp %f)' % MIN_TPUT
+    print 'bad kernel (min tp %f)\r\n' % MIN_TPUT,
     return False
 
 class BisectHelper(object):
-    def __init__(self, kernelPath, objPath, logFile):
+    def __init__(self, kernelPath, objPath, gitLog, buildLog):
         self.kernelPath = kernelPath
         self.objPath = objPath
-        self.logFile = logFile
+        self.gitLog = gitLog
+        self.buildLog = buildLog
 
     def __git_bisect(self, command):
         p = subprocess.Popen(['git', 'bisect', command],
@@ -162,7 +164,8 @@ class BisectHelper(object):
                              stdout=subprocess.PIPE)
         done = False
         for l in p.stdout:
-            self.logFile.write(l)
+            self.gitLog.write(l)
+            self.gitLog.flush()
             if l.endswith('is the first bad commit'):
                 done = True
         p.wait()
@@ -176,11 +179,16 @@ class BisectHelper(object):
     def bad(self):
         return self.__git_bisect('bad')
 
+    def bisectLog(self):
+        self.__git_bisect('log')
+
     def config(self):
         env = copy.copy(os.environ)
         env['LOCAL_VERSION'] = ''
         p = subprocess.Popen(['sh', 'gen-config.sh', self.objPath],
-                             cwd=self.kernelPath, env=env)
+                             cwd=self.kernelPath, env=env,
+                             stdout=self.buildLog,
+                             stderr=self.buildLog)
         p.wait()
         if p.returncode:
             raise Exception('gen-config.sh failed: %u' % p.returncode)
@@ -192,7 +200,9 @@ class BisectHelper(object):
         env = copy.copy(os.environ)
         env['LOCAL_VERSION'] = ''
         p = subprocess.Popen(['make', 'O=%s' % self.objPath, '-j', '96'],
-                             cwd=self.kernelPath, env=env)
+                             cwd=self.kernelPath, env=env,
+                             stdout=self.buildLog,
+                             stderr=self.buildLog)
         p.wait()
         if p.returncode:
             raise Exception('build failed: %u' % p.returncode)
@@ -200,13 +210,14 @@ class BisectHelper(object):
     def install(self):
         env = copy.copy(os.environ)
         env['LOCAL_VERSION'] = ''
-        p = subprocess.Popen(['sudo', 'make', 'O=%s' % self.objPath, '-j', '96',
+        p = subprocess.Popen(['sudo', 'make', 'O=%s' % self.objPath, '-j', '48',
                               'install', 'modules_install'],
                              cwd=self.kernelPath, env=env,
-                             stdout=subprocess.PIPE)
+                             stdout=subprocess.PIPE,
+                             stderr=self.buildLog)
         version = None
         for line in p.stdout:
-            print line,
+            self.buildLog.write(line)
             if line.find('DEPMOD') != -1:
                 vals = line.split()
                 version = vals[1]
@@ -267,13 +278,17 @@ def main(argv=None):
 
     time.sleep(DELAY)
 
-    log = open('bisect-results/log', 'a')
-    log.write('----\n')
-    bisector = BisectHelper('/home/sbw/linux-2.6', '/home/sbw/linux-2.6/obj', log)
+    gitLog = open('bisect-results/git-log', 'a')
+    gitLog.write('----\n')
+    buildLog = open('bisect-results/build-log', 'w+')
+    bisector = BisectHelper('/home/sbw/linux-2.6', '/home/sbw/linux-2.6/obj', 
+                            gitLog, buildLog)
 
     good = test_kernel()
     if DEBUG:
         exit(0)
+
+    print 'bisecting ...\r\n',
     
     done = False
     if good:
@@ -282,13 +297,20 @@ def main(argv=None):
         done = bisector.bad()
 
     if done:
+        gitLog.close()    
+        buildLog.close()
         reboot_default()
 
+    print 'building ...\r\n',
     bisector.build()
+    print 'installing ...\r\n',
     version = bisector.install()
-    
+    print 'rebooting %s ....\r\n' % version
+
+    gitLog.close()    
+    buildLog.close()
     if not DEBUG:
-        kexec(version)
+        reboot(version)
 
 if __name__ == '__main__':
     sys.exit(main())
