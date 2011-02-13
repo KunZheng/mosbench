@@ -31,9 +31,11 @@ static uint64_t nbytes;
 
 static unsigned int ncores;
 static unsigned int the_time;
+static int mmap_flags;
 
 static uint64_t pmc_start[NPMC];
 static uint64_t pmc_stop[NPMC];
+
 
 static struct {
 	union __attribute__((__aligned__(64))){
@@ -120,7 +122,7 @@ static void test(unsigned int core)
 
 	while (shared->run) {
 		void *ptr = mmap(0, nbytes, PROT_READ|PROT_WRITE,
-				 MAP_PRIVATE|MAP_ANONYMOUS, 0, 0);
+				 mmap_flags, 0, 0);
 		if (ptr == MAP_FAILED)
 			edie("mmap");
 		if (munmap(ptr, nbytes) < 0)
@@ -148,13 +150,14 @@ int main(int ac, char **av)
 {
 	int use_threads;
 	unsigned int i;
-	if (ac < 4)
-		die("usage: %s time ncores num-mbytes use-threads", av[0]);
+	if (ac < 6)
+		die("usage: %s time ncores num-kbytes use-threads use-populate", av[0]);
 
 	the_time = atoi(av[1]);
 	ncores = atoi(av[2]);
-	nbytes = atoi(av[3]) * 1024 * 1024;
+	nbytes = atoi(av[3]) * 1024;
 	use_threads = atoi(av[4]);
+	mmap_flags = MAP_PRIVATE | MAP_ANONYMOUS | (atoi(av[5]) ? MAP_POPULATE : 0);
 
 	initshared();
 

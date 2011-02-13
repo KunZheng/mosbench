@@ -13,6 +13,7 @@ import os
 # Config
 BENCHMARK     = micros.Populate()
 MIN_TPUT      = 4000000.0
+ENABLE        = False
 
 # Other knobs
 COMMAND_LINE  = 'root=/dev/sda2 ro console=tty0 console=ttyS1,19200n8r quiet'
@@ -109,8 +110,7 @@ Silas is running git-bisect to find when a scalability bug was introduced.
 
 This involves frequent reboots.
 
-This round of searching should complete shortly.  See '# screen -x tom' on
-hooverdam for more information.
+See '# screen -x tom' on hooverdam for more information.
 
 '''
     p = subprocess.Popen(['sudo', 'sh', '-c', 'echo -ne "%s" > /etc/motd' % msg])
@@ -166,7 +166,7 @@ class BisectHelper(object):
         for l in p.stdout:
             self.gitLog.write(l)
             self.gitLog.flush()
-            if l.endswith('is the first bad commit'):
+            if l.find('is the first bad commit') != -1:
                 done = True
         p.wait()
         if p.returncode:
@@ -264,6 +264,9 @@ def reboot_default():
     exit(0)
 
 def main(argv=None):
+    if not ENABLE:
+        exit(0)
+
     if argv is None:
         argv = sys.argv
     parse_args(argv)    

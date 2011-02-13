@@ -23,7 +23,7 @@ LIBS	= bench.c
 DEPS	= bench.h config.h atomic.h cmpxchg.h gemaphore.h \
 	  $(LIBS) $(MTRACEDEP) $(SUPPORT)/mtrace.h forp.h
 
-BINS	= memclone fops-dir proc-ping-pong fops-pipe icnt populate
+BINS	= memclone fops-dir proc-ping-pong fops-pipe icnt memmap
 BINS	:= $(addprefix $(O)/, $(BINS))
 
 all: $(BINS)

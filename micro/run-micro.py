@@ -56,7 +56,8 @@ def parse_args(argv):
     benchmarks = {
         'fops-dir':    micros.FopsDir,
         'memclone':    micros.Memclone,
-        'populate':    micros.Populate
+        'populate':    micros.Populate,
+        'memmap':      micros.Memmap
     }
 
     global BENCHMARK

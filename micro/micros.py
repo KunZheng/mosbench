@@ -54,17 +54,16 @@ class Memclone:
         else:
             return 'memclone-processes'
 
-class Populate:
+class Memmap:
     useThreads = 0
-    mbytes = 200
 
-    def __init__(self):
-        pass
+    def __init__(self, kbytes = 64):
+        self.kbytes = kbytes
 
     def run(self, ncores, duration):
         ghz = get_cpu_ghz()
-        p = subprocess.Popen(["o/populate", str(duration), str(ncores), 
-                              str(self.mbytes), str(self.useThreads)],
+        p = subprocess.Popen(["o/memmap", str(duration), str(ncores), 
+                              str(self.kbytes), str(self.useThreads), str(0)],
                              stdout=subprocess.PIPE)
         p.wait()
         if p.returncode:
@@ -75,6 +74,30 @@ class Populate:
 
     def get_name(self):
         if self.useThreads:
-            return 'populate-threads'
+            return 'memmap-threads-%u' % self.kbytes
         else:
-            return 'populate-processes'
+            return 'memmap-processes-%u' % self.kbytes
+
+class Populate:
+    useThreads = 0
+
+    def __init__(self, kbytes = 64):
+        self.kbytes = kbytes
+
+    def run(self, ncores, duration):
+        ghz = get_cpu_ghz()
+        p = subprocess.Popen(["o/memmap", str(duration), str(ncores), 
+                              str(self.kbytes), str(self.useThreads), str(1)],
+                             stdout=subprocess.PIPE)
+        p.wait()
+        if p.returncode:
+            raise Exception('Populate.run failed: %u' % p.returncode)
+        l = p.stdout.readline().strip()
+        m = re.search('rate: (\d+\.\d+) per sec', l)
+        return float(m.group(1))
+
+    def get_name(self):
+        if self.useThreads:
+            return 'populate-threads-%u' % self.kbytes
+        else:
+            return 'populate-processes-%u' % self.kbytes
