@@ -15,15 +15,21 @@ endif
 CWARNS	= -Wformat=2 -Wextra -Wmissing-noreturn -Wwrite-strings -Wshadow \
 	  -Wno-unused-parameter -Wmissing-format-attribute -fno-builtin \
 	  -Wswitch-default -Wmissing-prototypes \
-	  -Wmissing-declarations
+	  -Wmissing-declarations -Wno-format-nonliteral
 CFLAGS  = $(DEFS) -Wall -Werror -fno-strict-aliasing $(CWARNS) \
 	  -g -O2 -D_GNU_SOURCE -m64 $(MTRACE) -I..
 
-LIBS	= bench.c
-DEPS	= bench.h config.h atomic.h cmpxchg.h gemaphore.h \
+LIBS	= bench.c argv.c
+DEPS	= bench.h argv.h config.h atomic.h cmpxchg.h gemaphore.h \
 	  $(LIBS) $(MTRACEDEP) $(SUPPORT)/mtrace.h forp.h
 
-BINS	= memclone fops-dir proc-ping-pong fops-pipe icnt memmap
+BINS	= memclone \
+	  fops-dir \
+	  proc-ping-pong \
+	  fops-pipe icnt \
+	  memmap \
+	  procy
+
 BINS	:= $(addprefix $(O)/, $(BINS))
 
 all: $(BINS)
