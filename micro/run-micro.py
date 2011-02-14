@@ -57,7 +57,8 @@ def parse_args(argv):
         'fops-dir':    micros.FopsDir,
         'memclone':    micros.Memclone,
         'mempop':      micros.Mempop,
-        'memmap':      micros.Memmap
+        'memmap':      micros.Memmap,
+        'procy':       micros.Procy
     }
 
     global BENCHMARK
