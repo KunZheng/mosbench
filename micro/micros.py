@@ -67,7 +67,7 @@ class Memmap:
                              stdout=subprocess.PIPE)
         p.wait()
         if p.returncode:
-            raise Exception('Populate.run failed: %u' % p.returncode)
+            raise Exception('Memmap.run failed: %u' % p.returncode)
         l = p.stdout.readline().strip()
         m = re.search('rate: (\d+\.\d+) per sec', l)
         return float(m.group(1))
@@ -78,10 +78,10 @@ class Memmap:
         else:
             return 'memmap-processes-%u' % self.kbytes
 
-class Populate:
+class Mempop:
     useThreads = 0
 
-    def __init__(self, kbytes = 64):
+    def __init__(self, kbytes = 16):
         self.kbytes = kbytes
 
     def run(self, ncores, duration):
@@ -91,13 +91,13 @@ class Populate:
                              stdout=subprocess.PIPE)
         p.wait()
         if p.returncode:
-            raise Exception('Populate.run failed: %u' % p.returncode)
+            raise Exception('Mempop.run failed: %u' % p.returncode)
         l = p.stdout.readline().strip()
         m = re.search('rate: (\d+\.\d+) per sec', l)
         return float(m.group(1))
 
     def get_name(self):
         if self.useThreads:
-            return 'populate-threads-%u' % self.kbytes
+            return 'mempop-threads-%u' % self.kbytes
         else:
-            return 'populate-processes-%u' % self.kbytes
+            return 'mempop-processes-%u' % self.kbytes
