@@ -80,17 +80,18 @@ static int get_arg_table_index(const char *name)
 	die("get_arg_table_index failed on %s", name);
 }
 
-static size_t print_arg(const char *name, struct args *args, int i, 
+static size_t print_arg(const char *name, struct args *args,
 			char *buffer, size_t size)
 {
 	size_t cc;
-	int r;
+	int r, i;
 
 	cc = 0;
 	r = snprintf(buffer, size, "%s = ", name);
 	if (r < 0)
 		edie("snprintf");
 	cc += r;
+	i = get_arg_table_index(name);
 	cc += arg_table[i].get_value(args, &buffer[cc], i);
 	return cc;
 }
@@ -116,22 +117,20 @@ static void set_arg(const char *name, const char *value, struct args *args)
 
 void argv_sprint(struct args *args, char *buffer, size_t size)
 {
-	int i, k, r;
 	size_t cc;
+	int i, r;
 
 	if (!args->valid_args[0])
 		return;
 
 	cc = 0;
-	k = get_arg_table_index(args->valid_args[0]);
-	cc += print_arg(args->valid_args[0], args, k, &buffer[cc], size - cc);
+	cc += print_arg(args->valid_args[0], args, &buffer[cc], size - cc);
 	for (i = 1; args->valid_args[i]; i++) {
 		r = snprintf(&buffer[cc], size - cc, "  ");
 		if (r < 0)
 			edie("argv_sprint snprintf");
 		cc += r;
-		k = get_arg_table_index(args->valid_args[i]);
-		cc += print_arg(args->valid_args[i], args, k, 
+		cc += print_arg(args->valid_args[i], args,
 				&buffer[cc], size - cc);
 	}
 }
