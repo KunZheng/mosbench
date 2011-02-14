@@ -16,6 +16,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <fcntl.h>
+#include <signal.h>
 
 #include <pthread.h>
 
@@ -25,7 +26,7 @@
 
 #define NPMC 3
 
-#define MAX_PROC 256
+#define MAX_PROC 1024
 
 static uint64_t start;
 
@@ -35,12 +36,13 @@ static uint64_t pmc_stop[NPMC];
 static struct args the_args = {
 	.time = 5,
 	.ncores = 1,
+	.nprocs = 1,
 	.use_threads = 0,
 	.sched_op = "create-proc",
 };
 
 static const char *valid_args[] = 
-       { "time", "ncores", "use_threads", "sched_op", NULL };
+       { "time", "ncores", "nprocs", "use_threads", "sched_op", NULL };
 
 static void (*op_fn)(unsigned int core);
 
@@ -53,7 +55,7 @@ static struct {
 	struct gemaphore gema;
 } *shared;
 
-static void sighandler(int x)
+static void __noret__ sighandler(int x)
 {
 	float sec, rate, one;
 	uint64_t stop, tot;
@@ -64,9 +66,10 @@ static void sighandler(int x)
 
 	stop = usec();
 	shared->run = 0;
+	kill(0, SIGTERM);
 
 	tot = 0;
-	for (i = 0; i < the_args.ncores; i++)
+	for (i = 0; i < the_args.nprocs; i++)
 		tot += shared->count[i].v;
 
 	sec = (float)(stop - start) / 1000000;
@@ -81,19 +84,24 @@ static void sighandler(int x)
 			(float) shared->count[0].v;
 		printf("pmc(%u): %f per op\n", i, rate);
 	}
+
+	exit(EXIT_SUCCESS);
 }
 
-static void test(unsigned int core)
+static void test(unsigned int proc)
 {
-	setaffinity(core % the_args.ncores);
+	setaffinity(proc % the_args.ncores);
 
-	if (core == 0) {
+	if (proc == 0) {
 		unsigned int i;
 		
 		gemaphore_p(&shared->gema);
 
 		if (signal(SIGALRM, sighandler) == SIG_ERR)
-			die("signal failed\n");
+			edie("signal(SIGALRM)");
+		if (signal(SIGTERM, SIG_IGN) == SIG_ERR)
+			edie("signal(SIGKILL)");
+			
 		alarm(the_args.time);
 		start = usec();
 
@@ -107,8 +115,8 @@ static void test(unsigned int core)
 			__asm __volatile ("pause");
 	}
 	while (shared->run) {
-		op_fn(core);
-		shared->count[core].v++;
+		op_fn(proc);
+		shared->count[proc].v++;
 	}
 }
 
@@ -124,10 +132,10 @@ static void initshared(void)
 		      MAP_SHARED|MAP_ANONYMOUS, 0, 0);
 	if (shared == MAP_FAILED)
 		die("mmap failed");
-	gemaphore_init(&shared->gema, the_args.ncores - 1);
+	gemaphore_init(&shared->gema, the_args.nprocs - 1);
 }
 
-static void sleep_op(unsigned int core) 
+static void sleep_op(unsigned int proc) 
 {
 	struct timespec ts;
 	ts.tv_sec = 0;
@@ -140,7 +148,7 @@ static void *null_worker(void *x)
 	return NULL;
 }
 
-static void create_thread_op(unsigned int core)
+static void create_thread_op(unsigned int proc)
 {
 	pthread_t th;
 
@@ -149,7 +157,7 @@ static void create_thread_op(unsigned int core)
 	pthread_join(th, NULL);
 }
 
-static void create_proc_op(unsigned int core)
+static void create_proc_op(unsigned int proc)
 {
 	pid_t p = fork();
 	if (p < 0)
@@ -181,7 +189,7 @@ int main(int ac, char **av)
 	set_op_fn();
 	initshared();
 
-	for (i = 1; i < the_args.ncores; i++) {
+	for (i = 1; i < the_args.nprocs; i++) {
 		if (the_args.use_threads) {
 			pthread_t th;
 			if (pthread_create(&th, NULL, worker, (void *)(intptr_t)i) < 0)

@@ -7,6 +7,7 @@ struct args {
 	/* Don't forget to adjust the arg_table */
 	uint64_t	time;
 	uint64_t	ncores;
+	uint64_t	nprocs;
 	uint64_t	use_threads;
 	const char 	*sched_op;
 };
@@ -40,6 +41,7 @@ static struct arg_table {
 } arg_table[] = {
 	DEFINE_U64_ARG(time, NULL),
 	DEFINE_U64_ARG(ncores, NULL),
+	DEFINE_U64_ARG(nprocs, NULL),
 	DEFINE_U64_ARG(use_threads, NULL),
 	DEFINE_STR_ARG(sched_op, "<create-proc|create-thread|sleep>"),
 

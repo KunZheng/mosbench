@@ -106,9 +106,13 @@ class Procy(object):
         self.schedOp = schedOp
 
     def run(self, ncores, duration):
+        nprocs = ncores
+        if self.schedOp == 'sleep':
+            nprocs = ncores * 20
         p = subprocess.Popen(["o/procy", 
                               '-time', str(duration), 
                               '-ncores', str(ncores), 
+                              '-nprocs', str(nprocs),
                               '-use_threads', str(self.useThreads),
                               '-sched_op', self.schedOp],
                              stdout=subprocess.PIPE)
