@@ -1,8 +1,8 @@
 /*
- * Create threads, call mmap(MAP_POPULATE) and munmap
+ * Create threads, call mmap and munmap
  */
 
-#define TESTNAME "fops_dir"
+#define TESTNAME "memmap"
 
 #include <sys/mman.h>
 #include <sys/types.h>
@@ -36,7 +36,6 @@ static int mmap_flags;
 static uint64_t pmc_start[NPMC];
 static uint64_t pmc_stop[NPMC];
 
-
 static struct {
 	union __attribute__((__aligned__(64))){
 		volatile uint64_t v;
@@ -45,26 +44,6 @@ static struct {
 	volatile int run;
 	struct gemaphore gema;
 } *shared;
-
-static inline void xopen(const char *fn)
-{
-	int fd = open(fn, O_RDONLY);
-	if (fd < 0)
-		edie("open");
-	close(fd);
-}
-
-static inline void xstat(const char *fn)
-{
-	struct stat st;
-	if (stat(fn, &st))
-		edie("stat");
-}
-
-static inline void xgettid(const char *fn)
-{
-	syscall(SYS_gettid);
-}
 
 static void sighandler(int x)
 {

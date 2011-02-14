@@ -28,14 +28,15 @@
 #define MAX_PROC 256
 
 static uint64_t start;
-static uint64_t nbytes;
-
-static unsigned int ncores;
-static unsigned int the_time;
-static int mmap_flags;
 
 static uint64_t pmc_start[NPMC];
 static uint64_t pmc_stop[NPMC];
+
+static struct args the_args;
+static const char *valid_args[] = 
+       { "time", "ncores", "use_threads", "sched_op", NULL };
+
+static void (*op_fn)(unsigned int core);
 
 static struct {
 	union __attribute__((__aligned__(64))){
@@ -59,7 +60,7 @@ static void sighandler(int x)
 	shared->run = 0;
 
 	tot = 0;
-	for (i = 0; i < ncores; i++)
+	for (i = 0; i < the_args.ncores; i++)
 		tot += shared->count[i].v;
 
 	sec = (float)(stop - start) / 1000000;
@@ -78,7 +79,7 @@ static void sighandler(int x)
 
 static void test(unsigned int core)
 {
-	setaffinity(core % ncores);
+	setaffinity(core % the_args.ncores);
 
 	if (core == 0) {
 		unsigned int i;
@@ -87,7 +88,7 @@ static void test(unsigned int core)
 
 		if (signal(SIGALRM, sighandler) == SIG_ERR)
 			die("signal failed\n");
-		alarm(the_time);
+		alarm(the_args.time);
 		start = usec();
 
 		for (i = 0; i < NPMC; i++)
@@ -100,15 +101,7 @@ static void test(unsigned int core)
 			__asm __volatile ("pause");
 	}
 
-	while (shared->run) {
-		void *ptr = mmap(0, nbytes, PROT_READ|PROT_WRITE,
-				 mmap_flags, 0, 0);
-		if (ptr == MAP_FAILED)
-			edie("mmap");
-		if (munmap(ptr, nbytes) < 0)
-			edie("munmap");
-		shared->count[core].v++;
-	}
+	op_fn(core);
 }
 
 static void *worker(void *x)
@@ -123,32 +116,44 @@ static void initshared(void)
 		      MAP_SHARED|MAP_ANONYMOUS, 0, 0);
 	if (shared == MAP_FAILED)
 		die("mmap failed");
-	gemaphore_init(&shared->gema, ncores - 1);
+	gemaphore_init(&shared->gema, the_args.ncores - 1);
 }
 
-static struct args the_args;
-static const char *valid_args[] = { "time", "ncores", "use_threads", "sched_op", NULL };
+static void sleep_op(unsigned int core) 
+{
+	while (shared->run) {
+		shared->count[core].v++;
+	}
+}
+
+static void create_op(unsigned int core)
+{
+	while (shared->run) {
+		shared->count[core].v++;
+	}
+}
+
+static void set_op_fn(void)
+{
+	if (!strcmp(the_args.sched_op, "sleep"))
+		op_fn = sleep_op;
+	else if (!strcmp(the_args.sched_op, "create"))
+		op_fn = create_op;
+	else
+		die("bad sched_op: %s", the_args.sched_op);
+}
 
 int main(int ac, char **av)
 {
-	int use_threads;
 	unsigned int i;
-	if (ac < 5)
-		die("usage: %s time ncores use-threads operation", av[0]);
 
 	if (argv_parse(ac, av, &the_args, valid_args) != 4)
 		argv_usage(&the_args);
-	argv_print(&the_args);
-
-	the_time = atoi(av[1]);
-	ncores = atoi(av[2]);
-	use_threads = atoi(av[3]);
-	//the_op = atoi(av[4]);
-
+	set_op_fn();
 	initshared();
 
-	for (i = 1; i < ncores; i++) {
-		if (use_threads) {
+	for (i = 1; i < the_args.ncores; i++) {
+		if (the_args.use_threads) {
 			pthread_t th;
 			if (pthread_create(&th, NULL, worker, (void *)(intptr_t)i) < 0)
 				edie("pthread_create");
