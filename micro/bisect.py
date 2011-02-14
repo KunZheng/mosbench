@@ -10,27 +10,41 @@ import sys
 import re
 import os
 
+#
+# To start of the bisect process:
+#   $ cd linux
+#   $ git bisect start BAD GOOD
+#   $ make O=obj -j96
+#   # make O=obj install modules_install -j48
+#   # greboot ....
+#
+
 # Config
-BENCHMARK     = micros.Populate()
-MIN_TPUT      = 4000000.0
-ENABLE        = False
+BENCHMARK     = micros.Mempop(kbytes=16)
+MIN_TPUT      = 4200000.0
+ENABLE        = True
 
 # Other knobs
 COMMAND_LINE  = 'root=/dev/sda2 ro console=tty0 console=ttyS1,19200n8r quiet'
-START_CORE    = 1
-STOP_CORE     = 15
+START_CORE    = 40
+STOP_CORE     = 48
 DURATION      = 5
 NUM_RUNS      = 3
 DELAY         = 0
 DEBUG         = False
+BAD_REF       = None
+GOOD_REF      = None
 
 def usage(argv):
-    print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration]
+    print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration
+  -good good -bad bad ]
     'start' is starting core count
     'stop' is ending core count
     'duration' is the duration of each run
     'delay' is the number of seconds to delay before starting
     'debug' is True to enable debugging
+    'good' is good kernel ref. spec.
+    'bad' is bad kernel ref.spec.
 ''' % argv[0],
     exit(1)
 
@@ -57,12 +71,22 @@ def parse_args(argv):
         global DELAY
         DELAY = int(delay)
 
+    def good_handler(good):
+        global GOOD_REF
+        GOOD_REF = good
+        
+    def bad_handler(bad):
+        global BAD_REF
+        BAD_REF = bad
+
     handler = {
         '-start'     : start_handler,
         '-stop'      : stop_handler,
         '-duration'  : duration_handler,
         '-delay'     : delay_handler,
-        '-debug'     : debug_handler
+        '-debug'     : debug_handler,
+        '-good'      : good_handler,
+        '-bad'       : bad_handler
     }
 
     for i in range(0, len(args), 2):
@@ -126,15 +150,23 @@ def test_kernel():
     maxBase = 0
     maxTp = (0, 0)
     maxScale = (0, 0)
-    for c in range(START_CORE, STOP_CORE + 1):
+
+    for x in range(0, NUM_RUNS):
+        t = BENCHMARK.run(1, DURATION)
+        if t > maxBase:
+            maxBase = t
+
+    startCore = START_CORE
+    if startCore == 1:
+        startCore = 2
+
+    for c in range(startCore, STOP_CORE + 1):
         tp = 0
         for x in range(0, NUM_RUNS):
             t = BENCHMARK.run(c, DURATION)
             if t > tp:
                 tp = t
 
-        if c == 1:
-            maxBase = tp
         scale = tp / maxBase
         if tp > maxTp[1]:
             maxTp = (c, tp)
@@ -152,14 +184,22 @@ def test_kernel():
     return False
 
 class BisectHelper(object):
+    class BuildException(Exception):
+        def __init__(self, value):
+            self.value = value
+        def __str__(self):
+            return repr(self.value) 
+
     def __init__(self, kernelPath, objPath, gitLog, buildLog):
         self.kernelPath = kernelPath
         self.objPath = objPath
         self.gitLog = gitLog
         self.buildLog = buildLog
 
-    def __git_bisect(self, command):
-        p = subprocess.Popen(['git', 'bisect', command],
+    def __git_bisect(self, command, extraArgs = []):
+        args = ['git', 'bisect', command]
+        args.extend(extraArgs)
+        p = subprocess.Popen(args,
                              cwd=self.kernelPath,
                              stdout=subprocess.PIPE)
         done = False
@@ -179,6 +219,12 @@ class BisectHelper(object):
     def bad(self):
         return self.__git_bisect('bad')
 
+    def skip(self):
+        return self.__git_bisect('skip')        
+
+    def start(self, badRef, goodRef):
+        self.__git_bisect('start', extraArgs = [badRef, goodRef])
+
     def bisectLog(self):
         self.__git_bisect('log')
 
@@ -192,7 +238,6 @@ class BisectHelper(object):
         p.wait()
         if p.returncode:
             raise Exception('gen-config.sh failed: %u' % p.returncode)
-        
     
     def build(self):
         self.config()
@@ -205,7 +250,7 @@ class BisectHelper(object):
                              stderr=self.buildLog)
         p.wait()
         if p.returncode:
-            raise Exception('build failed: %u' % p.returncode)
+            raise BisectHelper.BuildException('build failed: %u' % p.returncode)
 
     def install(self):
         env = copy.copy(os.environ)
@@ -271,15 +316,20 @@ def main(argv=None):
         argv = sys.argv
     parse_args(argv)    
 
+    startMode = False
+    if GOOD_REF and BAD_REF:
+        startMode = True
+
     name = os.uname()[2]
-    if not DEBUG and not name.endswith('bisect'):
+    if not startMode and not DEBUG and not name.endswith('bisect'):
         print 'Not a bisect kernel'
         return
 
     if not DEBUG:
         fixup_motd()
 
-    time.sleep(DELAY)
+    if not startMode:
+        time.sleep(DELAY)
 
     gitLog = open('bisect-results/git-log', 'a')
     gitLog.write('----\n')
@@ -287,25 +337,45 @@ def main(argv=None):
     bisector = BisectHelper('/home/sbw/linux-2.6', '/home/sbw/linux-2.6/obj', 
                             gitLog, buildLog)
 
-    good = test_kernel()
-    if DEBUG:
-        exit(0)
+    if not startMode:
+        good = test_kernel()
+        if DEBUG:
+            exit(0)
+        print 'bisecting ...\r\n',
 
-    print 'bisecting ...\r\n',
-    
-    done = False
-    if good:
-        done = bisector.good()
+        done = False    
+        if good:
+            done = bisector.good()
+        else:
+            done = bisector.bad()
+
+        if done:
+            gitLog.close()    
+            buildLog.close()
+            reboot_default()
     else:
-        done = bisector.bad()
+        print 'starting ...\r\n',        
+        bisector.start(BAD_REF, GOOD_REF)
 
-    if done:
-        gitLog.close()    
-        buildLog.close()
-        reboot_default()
 
     print 'building ...\r\n',
-    bisector.build()
+    buildTries = 0
+    while True:
+        try:
+            buildTries += 1
+            bisector.build()
+            break;
+        except BisectHelper.BuildException as e:
+            print 'oops, build failed: %s\r\n' % e.value,
+            if buildTries > 3:
+                print 'too many broken builds, giving up...\r\n'
+                gitLog.write('* Too many broken builds *\n')
+                gitLog.close()
+                buildLog.close()
+                reboot_default()
+            print 'bisect skip and try again\r\n'
+            bisector.skip()
+
     print 'installing ...\r\n',
     version = bisector.install()
     print 'rebooting %s ....\r\n' % version
