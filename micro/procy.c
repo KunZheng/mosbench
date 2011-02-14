@@ -2,12 +2,12 @@
  * Create task per-core, each task does something
  */
 
-#define TESTNAME "fops_dir"
+#define TESTNAME "procy"
 
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sys/syscall.h>
+#include <sys/wait.h>
 
 #include <stdio.h>
 #include <stdint.h>
@@ -32,7 +32,13 @@ static uint64_t start;
 static uint64_t pmc_start[NPMC];
 static uint64_t pmc_stop[NPMC];
 
-static struct args the_args;
+static struct args the_args = {
+	.time = 5,
+	.ncores = 1,
+	.use_threads = 0,
+	.sched_op = "create-proc",
+};
+
 static const char *valid_args[] = 
        { "time", "ncores", "use_threads", "sched_op", NULL };
 
@@ -100,8 +106,10 @@ static void test(unsigned int core)
 		while (shared->run == 0)
 			__asm __volatile ("pause");
 	}
-
-	op_fn(core);
+	while (shared->run) {
+		op_fn(core);
+		shared->count[core].v++;
+	}
 }
 
 static void *worker(void *x)
@@ -121,24 +129,45 @@ static void initshared(void)
 
 static void sleep_op(unsigned int core) 
 {
-	while (shared->run) {
-		shared->count[core].v++;
-	}
+	struct timespec ts;
+	ts.tv_sec = 0;
+	ts.tv_nsec = 1000;
+	nanosleep(&ts, NULL);
 }
 
-static void create_op(unsigned int core)
+static void *null_worker(void *x)
 {
-	while (shared->run) {
-		shared->count[core].v++;
-	}
+	return NULL;
+}
+
+static void create_thread_op(unsigned int core)
+{
+	pthread_t th;
+
+	if (pthread_create(&th, NULL, null_worker, NULL) < 0)
+		edie("pthread_create");
+	pthread_join(th, NULL);
+}
+
+static void create_proc_op(unsigned int core)
+{
+	pid_t p = fork();
+	if (p < 0)
+		edie("fork");
+	else if (p == 0)
+		exit(EXIT_SUCCESS);
+	if (wait(NULL) < 0)
+		edie("wait");
 }
 
 static void set_op_fn(void)
 {
 	if (!strcmp(the_args.sched_op, "sleep"))
 		op_fn = sleep_op;
-	else if (!strcmp(the_args.sched_op, "create"))
-		op_fn = create_op;
+	else if (!strcmp(the_args.sched_op, "create-thread"))
+		op_fn = create_thread_op;
+	else if (!strcmp(the_args.sched_op, "create-proc"))
+		op_fn = create_proc_op;
 	else
 		die("bad sched_op: %s", the_args.sched_op);
 }
@@ -147,8 +176,8 @@ int main(int ac, char **av)
 {
 	unsigned int i;
 
-	if (argv_parse(ac, av, &the_args, valid_args) != 4)
-		argv_usage(&the_args);
+	argv_parse(ac, av, &the_args, valid_args);
+
 	set_op_fn();
 	initshared();
 

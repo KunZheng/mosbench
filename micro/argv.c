@@ -158,11 +158,12 @@ unsigned int argv_parse(int ac, char **av, struct args *args, const char **valid
 		value = av[i + 1];
 
 		k = is_valid_arg(name, valid_args);
-		if (k < 0 || seen_arg[k])
+		if (k < 0)
 			argv_usage(args);
 		
+		if (!seen_arg[k])
+			n++;
 		seen_arg[k] = 1;
-		n++;
 		set_arg(name, value, args);
 	}
 

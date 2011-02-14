@@ -41,7 +41,7 @@ static struct arg_table {
 	DEFINE_U64_ARG(time, NULL),
 	DEFINE_U64_ARG(ncores, NULL),
 	DEFINE_U64_ARG(use_threads, NULL),
-	DEFINE_STR_ARG(sched_op, "<create|sleep>"),
+	DEFINE_STR_ARG(sched_op, "<create-proc|create-thread|sleep>"),
 
 	{ NULL, NULL, 0, NULL, NULL }
 };
