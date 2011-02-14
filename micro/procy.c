@@ -66,7 +66,7 @@ static void __noret__ sighandler(int x)
 
 	stop = usec();
 	shared->run = 0;
-	kill(0, SIGTERM);
+	kill(-1 * getpid(), SIGTERM);
 
 	tot = 0;
 	for (i = 0; i < the_args.nprocs; i++)

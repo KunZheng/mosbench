@@ -9,10 +9,12 @@ import sys
 import re
 import os
 
+KERNEL_PREFIX = '-sbw-historical'
+
 START_CORE    = 0
 STOP_CORE     = 0
 DURATION      = 5
-DELAY         = 0
+DELAY         = 10
 NUM_RUNS      = 3
 DEBUG         = False
 PICKLE        = 'historical-results/pickle'
@@ -186,7 +188,7 @@ def resume(force = False):
     version = int(m.group(1))
 
     if not force and not bench_kernel(version):
-        print 'Not a bench version'
+        print 'Not a historical bench version'
         return
 
     if not force:
@@ -209,7 +211,7 @@ def resume(force = False):
     if not force:
         next = next_kernel(version)
         if next:
-            reboot('2.6.%u-sbw-historical' % (next))
+            reboot('2.6.%u%s' % (next, KERNEL_PREFIX))
         else:
             reboot_default()
 
@@ -222,6 +224,7 @@ def main(argv=None):
         setup(argv)
 
     time.sleep(DELAY)
+
     resume(force = DEBUG)
 
 if __name__ == '__main__':
