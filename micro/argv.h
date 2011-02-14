@@ -2,6 +2,7 @@
 
 struct args {
 	const char **valid_args;
+	const char *av0;
 	
 	uint64_t	time;
 	uint64_t	ncores;
