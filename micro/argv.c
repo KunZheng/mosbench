@@ -1,68 +1,45 @@
 #include <stddef.h>
 #include <stdlib.h>
 
+#define _ARGV_C
 #include "argv.h"
 #include "bench.h"
-
-static void set_u64_value(struct args *args, const char *value, int i);
-static int get_u64_value(struct args *args, char *value, int i);
-static void set_str_value(struct args *args, const char *value, int i);
-static int get_str_value(struct args *args, char *value, int i);
-
-#define DEFINE_U64_ARG(NAME) \
-	{ #NAME, "u64", offsetof(struct args, NAME), set_u64_value, get_u64_value }
-#define DEFINE_STR_ARG(NAME) \
-	{ #NAME, "string", offsetof(struct args, NAME), set_str_value, get_str_value }
-
-static struct arg_table {
-	const char *name;
-	const char *desc;
-	off_t offset;
-	void (*set_value)(struct args *args, const char *value, int index);
-	int (*get_value)(struct args *args, char *value, int index);
-} arg_table[] = {
-	DEFINE_U64_ARG(time),
-	DEFINE_U64_ARG(ncores),
-	DEFINE_U64_ARG(use_threads),
-	DEFINE_STR_ARG(sched_op),
-	{ NULL, NULL, 0, NULL, NULL }
-};
 
 static inline uint8_t *args_ptr(struct args *args, off_t off)
 {
 	return &(((uint8_t *)args)[off]);
 }
 
-static void set_u64_value(struct args *args, const char *value, int i)
+static void set_u64_value(struct args *args, const char *value, uint8_t *ptr)
 {
 	uint64_t *val_ptr;
-	val_ptr = (uint64_t *) args_ptr(args, arg_table[i].offset);
+	val_ptr = (uint64_t *) ptr;
 	*val_ptr = strtoll(value, NULL, 10);
 }
 
-static int get_u64_value(struct args *args, char *value, int i)
+static int get_u64_value(struct args *args, char *value, const uint8_t *ptr)
 {
 	uint64_t *val_ptr;
 	int r;
-	val_ptr = (uint64_t *) args_ptr(args, arg_table[i].offset);
+	val_ptr = (uint64_t *) ptr;
 	r = sprintf(value, "%lu", *val_ptr);
 	if (r < 0)
 		edie("get_u64_value sprintf");
 	return r;
 }
 
-static void set_str_value(struct args *args, const char *value, int i)
+static void set_str_value(struct args *args, const char *value, uint8_t *ptr)
 {
 	char **val_ptr;
-	val_ptr = (char **) args_ptr(args, arg_table[i].offset);
+	val_ptr = (char **) ptr;
 	*val_ptr = strdup(value);
 }
 
-static int get_str_value(struct args *args, char *value, int i)
+static int get_str_value(struct args *args, char *value, const uint8_t *ptr)
 {
 	char **val_ptr;
 	int r;
-	val_ptr = (char **) args_ptr(args, arg_table[i].offset);
+	val_ptr = (char **) ptr;
 	r = sprintf(value, "%s", *val_ptr);
 	if (r < 0)
 		edie("get_str_value sprintf");
@@ -92,7 +69,8 @@ static size_t print_arg(const char *name, struct args *args,
 		edie("snprintf");
 	cc += r;
 	i = get_arg_table_index(name);
-	cc += arg_table[i].get_value(args, &buffer[cc], i);
+	cc += arg_table[i].get_value(args, &buffer[cc], 
+				     args_ptr(args, arg_table[i].offset));
 	return cc;
 }
 
@@ -112,7 +90,7 @@ static void set_arg(const char *name, const char *value, struct args *args)
 	int i;
 
 	i = get_arg_table_index(name);
-	arg_table[i].set_value(args, value, i);
+	arg_table[i].set_value(args, value, args_ptr(args, arg_table[i].offset));
 }
 
 void argv_sprint(struct args *args, char *buffer, size_t size)
