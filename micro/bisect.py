@@ -1,5 +1,6 @@
 #!/usr/bin/python
 import subprocess
+import datetime
 import results
 import pickle
 import micros
@@ -12,6 +13,8 @@ import os
 
 #
 # To start of the bisect process:
+#   $ ./bisect.py -bad bad-kernel -good good-kernel
+# or by hand:
 #   $ cd linux
 #   $ git bisect start BAD GOOD
 #   $ make O=obj -j96
@@ -20,16 +23,16 @@ import os
 #
 
 # Config
-BENCHMARK     = micros.Mempop(kbytes=16)
-MIN_TPUT      = 4200000.0
+BENCHMARK     = micros.Exim(logPath=('historical-log/%u-log' % os.getpid()))
+MIN_TPUT      = 11500.0
 ENABLE        = True
 
 # Other knobs
-COMMAND_LINE  = 'root=/dev/sda2 ro console=tty0 console=ttyS1,19200n8r quiet'
+RESULT_BASE   = 'bisect-results'
 START_CORE    = 40
 STOP_CORE     = 48
-DURATION      = 5
-NUM_RUNS      = 3
+DURATION      = 15
+NUM_RUNS      = 1
 DELAY         = 0
 DEBUG         = False
 BAD_REF       = None
@@ -146,36 +149,34 @@ def bad_kernel_exit():
 def good_kernel_exit():
     exit(0)
 
+class MinResult(object):
+    def __init__(self, minValue):
+        self.minValue = minValue
+        self.bad = False
+        self.good = True
+
+    def new_value(self, value):
+        if value >= self.minValue:
+            self.bad = True
+
+    def done(self):
+        return self.bad
+
 def test_kernel():
-    maxBase = 0
+
     maxTp = (0, 0)
-    maxScale = (0, 0)
-
-    for x in range(0, NUM_RUNS):
-        t = BENCHMARK.run(1, DURATION)
-        if t > maxBase:
-            maxBase = t
-
-    startCore = START_CORE
-    if startCore == 1:
-        startCore = 2
-
-    for c in range(startCore, STOP_CORE + 1):
+    for c in range(START_CORE, STOP_CORE + 1):
         tp = 0
         for x in range(0, NUM_RUNS):
             t = BENCHMARK.run(c, DURATION)
             if t > tp:
                 tp = t
 
-        scale = tp / maxBase
         if tp > maxTp[1]:
             maxTp = (c, tp)
-        if scale > maxScale[1]:
-            maxScale = (c, scale)
-        print 'bisect: %s %u / %u -- %f %f (max scale %u, %f) (max tp %u, %f)\r\n' % (BENCHMARK.get_name(), 
-                                                                                      c, STOP_CORE, tp, scale,
-                                                                                      maxScale[0], maxScale[1], 
-                                                                                      maxTp[0], maxTp[1]),
+        print 'bisect: %s %u / %u -- %f (max tp %u, %f)\r\n' % (BENCHMARK.get_name(), 
+                                                                c, STOP_CORE, tp,
+                                                                maxTp[0], maxTp[1]),
         if maxTp[1] > MIN_TPUT:
             print 'good kernel (min tp %f)\r\n' % MIN_TPUT,
             return True
@@ -288,18 +289,6 @@ def reboot(name):
     print 'Rebooting...'
     exit(0)
 
-def kexec(name):
-    p = subprocess.Popen(['sudo', 'kexec', '-l', '/boot/vmlinuz-%s' % name,
-                          '--append="%s"' % COMMAND_LINE])
-    p.wait()
-    if p.returncode:
-        raise Exception('kexec -l failed: %u' % p.returncode)
-    p = subprocess.Popen(['sync'])
-    p.wait()
-    p = subprocess.Popen(['sudo', 'kexec', '-e'])
-    p.wait()
-    raise Exception('kexec -e returned: %u' % p.returncode)
-
 def reboot_default():
     p = subprocess.Popen(['sudo', 'shutdown', '-r', 'now'])
     p.wait()
@@ -331,14 +320,35 @@ def main(argv=None):
     if not startMode:
         time.sleep(DELAY)
 
-    gitLog = open('bisect-results/git-log', 'a')
+    gitLog = None
+    buildLog = None
+    resultPath = None
+
+    if startMode:
+        now = datetime.datetime.now()
+        resultPath = RESULT_BASE + '/' + BENCHMARK.get_name()
+        resultPath += '.' + str(now.month)
+        resultPath += '.' + str(now.day)
+        resultPath += '.' + str(now.year)
+        resultPath += '.' + str(os.getpid())
+        os.mkdir(resultPath)
+        status = open(RESULT_BASE + '/' + 'status', 'w')
+        status.write(resultPath)
+        status.close()
+    else:
+        status = open(RESULT_BASE + '/' + 'status', 'r')
+        resultPath = status.readline()
+        status.close()
+
+    gitLog = open(resultPath + '/git-log', 'a')
     gitLog.write('----\n')
-    buildLog = open('bisect-results/build-log', 'w+')
+    buildLog = open(resultPath + '/build-log', 'w+')
     bisector = BisectHelper('/home/sbw/linux-2.6', '/home/sbw/linux-2.6/obj', 
                             gitLog, buildLog)
 
     if not startMode:
         good = test_kernel()
+
         if DEBUG:
             exit(0)
         print 'bisecting ...\r\n',
@@ -354,7 +364,7 @@ def main(argv=None):
             buildLog.close()
             reboot_default()
     else:
-        print 'starting ...\r\n',        
+        print 'starting (%s)...\r\n' % resultPath,
         bisector.start(BAD_REF, GOOD_REF)
 
 
