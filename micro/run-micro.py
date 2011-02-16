@@ -9,6 +9,7 @@ START_CORE    = 0
 STOP_CORE     = 0
 BENCHMARK     = None
 DURATION      = 2
+NUM_RUNS      = 3
 
 def usage(argv):
     print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration ] 
@@ -58,7 +59,8 @@ def parse_args(argv):
         'memclone':    micros.Memclone,
         'mempop':      micros.Mempop,
         'memmap':      micros.Memmap,
-        'procy':       micros.Procy
+        'procy':       micros.Procy,
+        'exim':        micros.Exim
     }
 
     global BENCHMARK
@@ -80,7 +82,7 @@ def main(argv=None):
     print '# cpu\t\tthroughput\tmin scale\tmax scale'
     for c in range(1, STOP_CORE + 1):
         tp = 0
-        for x in range(0, 3):
+        for x in range(0, NUM_RUNS):
             t = BENCHMARK.run(c, DURATION)
             if t > tp:
                 tp = t

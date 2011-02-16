@@ -1,5 +1,7 @@
 import subprocess
+import time
 import re
+import os
 
 def get_cpu_ghz():
     f = open('/proc/cpuinfo', 'r')
@@ -128,3 +130,54 @@ class Procy(object):
             return 'procy-threads-%s' % self.schedOp
         else:
             return 'procy-processes-%s' % self.schedOp
+
+class Exim(object):
+    mosbenchPath='/home/sbw/mosbench'
+    
+    def __init__(self, logPath=None):
+        if not logPath:
+            logPath = '/tmp/micros-Exim-%u-log' % os.getpid()
+        self.logFile = open(logPath, 'w')
+
+    def run(self, ncores, duration):
+        # XXX the path could exist, and not be mounted
+        if not os.path.exists('/tmp/mosbench/tmpfs-separate'):
+            p = subprocess.Popen(['sudo', './mkmounts', 'tmpfs-separate'],
+                                 cwd=self.mosbenchPath)
+            p.wait()
+            if p.returncode:
+                raise Exception('mkmounts failed: %u' % p.returncode)            
+
+        p = subprocess.Popen(['sed', '-i', '-e', 
+                              's/NUM_CORES=[1-9][0-9]*/NUM_CORES=%u/g' % ncores,
+                              self.mosbenchPath + '/config.py'])
+        p.wait()
+        if p.returncode:
+            raise Exception('Exim.run sed failed: %u' % p.returncode)
+        
+        p = subprocess.Popen(['make', 'bench'],
+                             cwd=self.mosbenchPath, 
+                             stdout=subprocess.PIPE,
+                             stderr=self.logFile)
+
+        tp = 0.0
+        while True:
+            if p.stdout.closed:
+                break
+            if p.returncode:
+                break
+            l = p.stdout.readline()
+            if l == '':
+                break
+            m = re.search('.*\=\> (\d+) messages \((\d+\.\d+) secs.*', l)
+            if m:
+                tp = float(m.group(1)) / float(m.group(2))
+
+        p.wait()
+        if p.returncode:
+            raise Exception('Exim.run make bench failed: %u' % p.returncode)
+        time.sleep(1)
+        return tp
+
+    def get_name(self):
+        return 'exim'
