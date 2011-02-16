@@ -135,12 +135,9 @@ static void initshared(void)
 	gemaphore_init(&shared->gema, the_args.nprocs - 1);
 }
 
-static void sleep_op(unsigned int proc) 
+static void yield_op(unsigned int proc) 
 {
-	struct timespec ts;
-	ts.tv_sec = 0;
-	ts.tv_nsec = 1000;
-	nanosleep(&ts, NULL);
+	sched_yield();
 }
 
 static void *null_worker(void *x)
@@ -170,8 +167,8 @@ static void create_proc_op(unsigned int proc)
 
 static void set_op_fn(void)
 {
-	if (!strcmp(the_args.sched_op, "sleep"))
-		op_fn = sleep_op;
+	if (!strcmp(the_args.sched_op, "yield"))
+		op_fn = yield_op;
 	else if (!strcmp(the_args.sched_op, "create-thread"))
 		op_fn = create_thread_op;
 	else if (!strcmp(the_args.sched_op, "create-proc"))
