@@ -24,7 +24,6 @@ import os
 
 # Config
 BENCHMARK     = micros.Exim(logPath=('historical-log/%u-log' % os.getpid()))
-MIN_TPUT      = 11500.0
 ENABLE        = True
 
 # Other knobs
@@ -37,6 +36,50 @@ DELAY         = 0
 DEBUG         = False
 BAD_REF       = None
 GOOD_REF      = None
+
+class UpperBoundResult(object):
+    '''BAD if an upper bound is exceeded, GOOD otherwise'''
+    def __init__(self, upperBound):
+        self.upperBound = upperBound
+        self.bad = False
+        self.good = True
+
+    def new_value(self, value):
+        if value >= self.upperBound:
+            self.bad = True
+            self.good = False
+
+    def done(self):
+        return self.bad
+
+    def __str__(self):
+        if self.bad:
+            return 'BAD (upper bound): value greater than %f' % self.upperBound
+        else:
+            return 'GOOD (upper bound): no value greater than %f' % self.upperBound
+
+class MinimumResult(object):
+    '''GOOD if a minimum result is met, BAD otherwise'''
+    def __init__(self, lowerBound):
+        self.lowerBound = lowerBound
+        self.bad = True
+        self.good = False
+
+    def new_value(self, value):
+        if value >= self.lowerBound:
+            self.good = True
+            self.bad = False
+
+    def done(self):
+        return self.good
+
+    def __str__(self):
+        if self.good:
+            return 'GOOD (minimum): value greater than %f' % self.lowerBound
+        else:
+            return 'BAD (minimum): no value greater than %f' % self.lowerBound
+
+RESULT = UpperBoundResult(11000.0)
 
 def usage(argv):
     print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration
@@ -149,20 +192,7 @@ def bad_kernel_exit():
 def good_kernel_exit():
     exit(0)
 
-class MinResult(object):
-    def __init__(self, minValue):
-        self.minValue = minValue
-        self.bad = False
-        self.good = True
-
-    def new_value(self, value):
-        if value >= self.minValue:
-            self.bad = True
-
-    def done(self):
-        return self.bad
-
-def test_kernel():
+def test_kernel(result):
 
     maxTp = (0, 0)
     for c in range(START_CORE, STOP_CORE + 1):
@@ -172,17 +202,14 @@ def test_kernel():
             if t > tp:
                 tp = t
 
-        if tp > maxTp[1]:
-            maxTp = (c, tp)
-        print 'bisect: %s %u / %u -- %f (max tp %u, %f)\r\n' % (BENCHMARK.get_name(), 
-                                                                c, STOP_CORE, tp,
-                                                                maxTp[0], maxTp[1]),
-        if maxTp[1] > MIN_TPUT:
-            print 'good kernel (min tp %f)\r\n' % MIN_TPUT,
-            return True
+        result.new_value(tp)
+        print 'bisect: %s %u / %u -- %f\r\n' % (BENCHMARK.get_name(), 
+                                                                c, STOP_CORE, tp),
+        if result.done():
+            break
     
-    print 'bad kernel (min tp %f)\r\n' % MIN_TPUT,
-    return False
+    print result
+    return result
 
 class BisectHelper(object):
     class BuildException(Exception):
@@ -215,9 +242,11 @@ class BisectHelper(object):
         return done
         
     def good(self):
+        self.gitLog.write('[ good ]')
         return self.__git_bisect('good')
 
     def bad(self):
+        self.gitLog.write('[ bad ]')
         return self.__git_bisect('bad')
 
     def skip(self):
@@ -347,17 +376,19 @@ def main(argv=None):
                             gitLog, buildLog)
 
     if not startMode:
-        good = test_kernel()
+        result = test_kernel(RESULT)
 
         if DEBUG:
             exit(0)
         print 'bisecting ...\r\n',
 
         done = False    
-        if good:
+        if result.good:
             done = bisector.good()
-        else:
+        elif result.bad:
             done = bisector.bad()
+        else:
+            raise Exception('No good or bad result')
 
         if done:
             gitLog.close()    
