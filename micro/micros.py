@@ -109,8 +109,8 @@ class Procy(object):
 
     def run(self, ncores, duration):
         nprocs = ncores
-        if self.schedOp == 'sleep':
-            nprocs = ncores * 20
+        if self.schedOp == 'yield':
+            nprocs = ncores * 16
         p = subprocess.Popen(["o/procy", 
                               '-time', str(duration), 
                               '-ncores', str(ncores), 
