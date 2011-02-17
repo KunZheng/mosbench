@@ -23,16 +23,17 @@ import os
 #
 
 # Config
-BENCHMARK     = micros.Exim(logPath=('historical-log/%u-log' % os.getpid()))
+#BENCHMARK     = micros.Exim(logPath=('historical-log/%u-log' % os.getpid()))
+BENCHMARK     = micros.Procy(schedOp='yield')
 ENABLE        = True
 
 # Other knobs
 RESULT_BASE   = 'bisect-results'
-START_CORE    = 40
-STOP_CORE     = 48
-DURATION      = 15
-NUM_RUNS      = 1
-DELAY         = 0
+START_CORE    = 45
+STOP_CORE     = 45
+DURATION      = 5
+NUM_RUNS      = 3
+DELAY         = 10
 DEBUG         = False
 BAD_REF       = None
 GOOD_REF      = None
@@ -43,18 +44,20 @@ class UpperBoundResult(object):
         self.upperBound = upperBound
         self.bad = False
         self.good = True
+        self.value = None
 
     def new_value(self, value):
         if value >= self.upperBound:
             self.bad = True
             self.good = False
+            self.value = value
 
     def done(self):
         return self.bad
 
     def __str__(self):
         if self.bad:
-            return 'BAD (upper bound): value greater than %f' % self.upperBound
+            return 'BAD (upper bound): value %f greater than %f' % (self.value, self.upperBound)
         else:
             return 'GOOD (upper bound): no value greater than %f' % self.upperBound
 
@@ -79,7 +82,7 @@ class MinimumResult(object):
         else:
             return 'BAD (minimum): no value greater than %f' % self.lowerBound
 
-RESULT = UpperBoundResult(11000.0)
+RESULT = UpperBoundResult(30000000.0)
 
 def usage(argv):
     print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration
@@ -241,12 +244,12 @@ class BisectHelper(object):
             raise Exception('git bisect %s failed: %u' % (command, p.returncode))
         return done
         
-    def good(self):
-        self.gitLog.write('[ good ]')
+    def good(self, result):
+        self.gitLog.write(result.__str__() + '\n')
         return self.__git_bisect('good')
 
-    def bad(self):
-        self.gitLog.write('[ bad ]')
+    def bad(self, result):
+        self.gitLog.write(result.__str__() + '\n')
         return self.__git_bisect('bad')
 
     def skip(self):
@@ -384,9 +387,9 @@ def main(argv=None):
 
         done = False    
         if result.good:
-            done = bisector.good()
+            done = bisector.good(result)
         elif result.bad:
-            done = bisector.bad()
+            done = bisector.bad(result)
         else:
             raise Exception('No good or bad result')
 
