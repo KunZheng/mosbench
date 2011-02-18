@@ -115,7 +115,8 @@ static void test(unsigned int proc)
 	
 	setaffinity(proc % ncores);
 
-	snprintf(fn, sizeof(fn), "%s.%d", the_file, 0);
+	snprintf(fn, sizeof(fn), "%s.%d", the_file, proc);
+	printf("%u %s\n", proc, fn);
 
 	if (proc == 0) {
 		unsigned int i;
