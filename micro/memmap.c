@@ -21,6 +21,7 @@
 
 #include "bench.h"
 #include "gemaphore.h"
+#include "support/mtrace.h"
 
 #define NPMC 3
 
@@ -47,19 +48,21 @@ static struct {
 
 static void sighandler(int x)
 {
+	struct mtrace_appdata_entry entry;
 	float sec, rate, one;
 	uint64_t stop, tot;
 	unsigned int i;
 
-	for (i = 0; i < NPMC; i++)
-		pmc_stop[i] = read_pmc(i);
-
-	stop = usec();
-	shared->run = 0;
-
 	tot = 0;
 	for (i = 0; i < ncores; i++)
 		tot += shared->count[i].v;
+
+	entry.u64 = tot;
+	mtrace_appdata_register(&entry);
+	mtrace_enable_set(0, TESTNAME);
+
+	stop = usec();
+	shared->run = 0;
 
 	sec = (float)(stop - start) / 1000000;
 	rate = (float)tot / sec;
@@ -67,6 +70,9 @@ static void sighandler(int x)
 
 	printf("rate: %f per sec\n", rate);
 	printf("lat: %f usec\n", one);
+
+	for (i = 0; i < NPMC; i++)
+		pmc_stop[i] = read_pmc(i);
 
 	for (i = 0; i < NPMC; i++) {
 		rate = (float)(pmc_stop[i] - pmc_start[i]) / 
@@ -92,6 +98,7 @@ static void test(unsigned int core)
 		for (i = 0; i < NPMC; i++)
 			pmc_start[i] = read_pmc(i);
 
+		mtrace_enable_set(1, TESTNAME);
 		shared->run = 1;
 	} else {
 		gemaphore_v(&shared->gema);
