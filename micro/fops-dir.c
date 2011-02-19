@@ -116,7 +116,6 @@ static void test(unsigned int proc)
 	setaffinity(proc % ncores);
 
 	snprintf(fn, sizeof(fn), "%s.%d", the_file, proc);
-	printf("%u %s\n", proc, fn);
 
 	if (proc == 0) {
 		unsigned int i;
@@ -164,7 +163,7 @@ static void initfile(void)
 	for (i = 0; i < nprocs; i++) {
 		snprintf(buf, sizeof(buf), "%s.%d", the_file, i);
 		setaffinity(i % ncores);
-		fd = creat(buf, S_IRUSR|S_IWUSR);
+		fd = creat(buf, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH);
 		if (fd < 0)
 			edie("creat");
 
