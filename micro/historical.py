@@ -11,17 +11,18 @@ import os
 
 KERNEL_PREFIX = '-sbw-historical'
 
-START_CORE    = 0
+START_CORE    = 1
 STOP_CORE     = 0
 DURATION      = 5
 DELAY         = 10
 NUM_RUNS      = 3
 DEBUG         = False
 PICKLE        = 'historical-results/pickle'
-VERSIONS      = [ 37, 36, 35, 34, 33, 32, 30, 29, 28, 27, 26, 25 ]
-#VERSIONS      = []
-BENCHMARKS    = [ micros.Procy(schedOp='create-proc'), 
-                  micros.Procy(schedOp='create-thread') ]
+VERSIONS      = []
+#VERSIONS      = [ 38, 37, 36, 35, 34, 33, 32, 30, 29, 28, 27, 26, 25 ]
+BENCHMARKS    = [ micros.FopsDir(baseFileName='/root/tmp/foo') ]
+#BENCHMARKS    = [ micros.Procy(schedOp='yield') ]
+#BENCHMARKS    = [ micros.Exim(logPath=('historical-log/%u-log' % os.getpid())) ]
 
 def usage(argv):
     print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration 
@@ -147,7 +148,7 @@ def do_one(benchmark, dataLog, version, benchResults):
     maxBase = 0
     maxTp = (0, 0)
     maxScale = (0, 0)
-    for c in range(1, STOP_CORE + 1):
+    for c in range(START_CORE, STOP_CORE + 1):
         tp = 0
         for x in range(0, NUM_RUNS):
             t = benchmark.run(c, DURATION)
