@@ -12,10 +12,8 @@ def get_cpu_ghz():
     return None
 
 class FopsDir(object):
-    baseFileName = '/root/tmp/foo'
-    
-    def __init__(self):
-        pass
+    def __init__(self, baseFileName='/root/tmp/foo'):
+        self.baseFileName = baseFileName
 
     def run(self, ncores, duration):
         p = subprocess.Popen(["o/fops-dir", str(duration), str(ncores), 
