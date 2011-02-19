@@ -24,19 +24,22 @@ import os
 
 # Config
 #BENCHMARK     = micros.Exim(logPath=('historical-log/%u-log' % os.getpid()))
-BENCHMARK     = micros.Procy(schedOp='yield')
-ENABLE        = True
+#BENCHMARK     = micros.Procy(schedOp='yield')
+BENCHMARK     = micros.FopsDir(baseFileName='/root/tmp/foo')
+ENABLE        = False
 
 # Other knobs
+GREBOOT       = '/home/sbw/local/bin/greboot'
 RESULT_BASE   = 'bisect-results'
-START_CORE    = 45
-STOP_CORE     = 45
+START_CORE    = 20
+STOP_CORE     = 20
 DURATION      = 5
 NUM_RUNS      = 3
 DELAY         = 10
 DEBUG         = False
 BAD_REF       = None
 GOOD_REF      = None
+SKIP          = False
 
 class UpperBoundResult(object):
     '''BAD if an upper bound is exceeded, GOOD otherwise'''
@@ -82,7 +85,7 @@ class MinimumResult(object):
         else:
             return 'BAD (minimum): no value greater than %f' % self.lowerBound
 
-RESULT = UpperBoundResult(30000000.0)
+RESULT = UpperBoundResult(10000000.0)
 
 def usage(argv):
     print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration
@@ -128,6 +131,10 @@ def parse_args(argv):
         global BAD_REF
         BAD_REF = bad
 
+    def skip_handler(skip):
+        global SKIP
+        SKIP = bool(skip)
+
     handler = {
         '-start'     : start_handler,
         '-stop'      : stop_handler,
@@ -135,7 +142,8 @@ def parse_args(argv):
         '-delay'     : delay_handler,
         '-debug'     : debug_handler,
         '-good'      : good_handler,
-        '-bad'       : bad_handler
+        '-bad'       : bad_handler,
+        '-skip'      : skip_handler
     }
 
     for i in range(0, len(args), 2):
@@ -151,29 +159,6 @@ def parse_args(argv):
     if STOP_CORE == 0:
         print "Specify number of CPUs on command line"
         usage()
-
-def setup(argv):
-    pass
-
-def reboot(name):
-    p = subprocess.Popen(['sudo', 'greboot', name],
-                         stdin=subprocess.PIPE)
-    p.stdin.write('y\n')
-    p.stdin.write('y\n')
-    p.stdin.write('y\n')
-    p.wait()
-    if p.returncode:
-        raise Exception('grebooot failed: %u' % p.returncode)
-    print 'Rebooting...'
-    exit(0)
-
-def reboot_default():
-    p = subprocess.Popen(['sudo', 'shutdown', '-r', 'now'])
-    p.wait()
-    if p.returncode:
-        raise Exception('shutdown failed: %u' % p.returncode)
-    print 'Rebooting into default...'
-    exit(0)
 
 def fixup_motd():
     msg = '''
@@ -308,7 +293,7 @@ class BisectHelper(object):
         return version
 
 def reboot(name):
-    p = subprocess.Popen(['sudo', 'greboot', name],
+    p = subprocess.Popen(['sudo', GREBOOT, name],
                          stdin=subprocess.PIPE)
     p.stdin.write('y\n')
     p.stdin.write('y\n')
@@ -342,14 +327,14 @@ def main(argv=None):
         startMode = True
 
     name = os.uname()[2]
-    if not startMode and not DEBUG and not name.endswith('bisect'):
+    if not SKIP and not startMode and not DEBUG and name.find('bisect') == -1:
         print 'Not a bisect kernel'
         return
 
     if not DEBUG:
         fixup_motd()
 
-    if not startMode:
+    if not startMode and not SKIP:
         time.sleep(DELAY)
 
     gitLog = None
@@ -378,7 +363,7 @@ def main(argv=None):
     bisector = BisectHelper('/home/sbw/linux-2.6', '/home/sbw/linux-2.6/obj', 
                             gitLog, buildLog)
 
-    if not startMode:
+    if not startMode and not SKIP:
         result = test_kernel(RESULT)
 
         if DEBUG:
@@ -397,6 +382,9 @@ def main(argv=None):
             gitLog.close()    
             buildLog.close()
             reboot_default()
+    elif SKIP:
+        print 'skipping ...\r\n'
+        bisector.skip()       
     else:
         print 'starting (%s)...\r\n' % resultPath,
         bisector.start(BAD_REF, GOOD_REF)
