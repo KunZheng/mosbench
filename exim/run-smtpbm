@@ -31,6 +31,7 @@ def startLoad(count, port, eximInstances):
             subprocess.Popen(["numactl", "-C", str(i % CORES),
                               "./smtpbm", "127.0.0.1", str(port + (i % eximInstances)),
                               "%d@mosbench.org" % i, "mosbench@mosbench.org",
+                              str(1 if i == 0 else 0),
                               ],
                              stdout = subprocess.PIPE))
         # Don't hit the system too hard

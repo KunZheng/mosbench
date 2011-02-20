@@ -24,10 +24,11 @@
 static int total;
 static double start;
 static int mtrace_enable;
+static int mtrace_captain;
 
 static void usage(void)
 {
-	fprintf(stderr, "Usage: smtpbm ip-address port username from-address [cpu]\n");
+	fprintf(stderr, "Usage: smtpbm ip-address port username from-address mtrace\n");
 	exit(1);
 }
 
@@ -142,7 +143,10 @@ static void reset(void)
 
 static void mtrace_toggle(void)
 {
-	mtrace_enable_set(!mtrace_enable, "smtpbm", strlen("smtpbm"));
+	if (!mtrace_captain)
+		return;
+
+	mtrace_enable_set(!mtrace_enable, "smtpbm");
 	mtrace_enable = !mtrace_enable;
 }
 
@@ -173,13 +177,8 @@ int main(int argc, char ** argv)
 	if(argc < 5)
 		usage();
 
-	if (argc > 5) {
-		cpu_set_t cpuset;
-		CPU_ZERO(&cpuset);
-		CPU_SET(atoi(argv[5]), &cpuset);
-		if (sched_setaffinity(0, sizeof(cpuset), &cpuset) < 0)
-			oops("setaffinity");
-	}
+	if (argc > 5)
+		mtrace_captain = atoi(argv[5]);
 
 	if(prctl(PR_SET_PDEATHSIG, SIGINT, 0, 0, 0) == -1)
 		oops("prctl");
