@@ -28,7 +28,9 @@ BINS	= memclone \
 	  proc-ping-pong \
 	  fops-pipe icnt \
 	  memmap \
-	  procy
+	  procy \
+	  bfish-shared \
+	  bfish-msg
 
 BINS	:= $(addprefix $(O)/, $(BINS))
 
