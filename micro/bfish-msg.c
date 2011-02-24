@@ -10,6 +10,8 @@
 #include <string.h>
 
 #include "bench.h"
+#include "atomic.h"
+#include "bfish.h"
 
 #define CLINESZ 64
 
@@ -31,7 +33,6 @@ static struct {
 	volatile int go;
 
 	char *clines;
-	
 	uint64_t start;
 } *shared;
 
@@ -91,6 +92,46 @@ static void * workloop(void *x)
 	return 0;
 }
 
+static void do_op(void)
+{
+	char *b;
+	int i;
+
+	b = shared->clines;
+
+	switch (nclines) {
+	case 1:
+		XOP(b);
+		break;
+	case 2:
+		XOP(b);
+		XOP(b + 64);
+		break;
+	case 4:
+		XOP(b);
+		XOP(b + 64);
+		XOP(b + 128);
+		XOP(b + 192);
+		break;
+	case 8:
+		XOP(b);
+		XOP(b + 64);
+		XOP(b + 128);
+		XOP(b + 192);
+		XOP(b + 256);
+		XOP(b + 320);
+		XOP(b + 384);
+		XOP(b + 448);
+		break;
+	default:
+		for (i = 0; i < nclines; i++) {
+			__asm__ __volatile__("lock; incq %0" : "+m" (*b));
+			b += 64;
+		}
+		break;
+	}
+}
+
 static void * serverloop(void *x)
 {
 	int c = (long)x;
@@ -108,6 +149,7 @@ static void * serverloop(void *x)
 		flag = 0;
 		for (i = 0; i < nthreads; i++) {
 			if (shared->signal[i].v) {
+				do_op();
 				shared->signal[i].v = 0;
 				flag = 1;
 			}

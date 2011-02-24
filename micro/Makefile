@@ -37,6 +37,7 @@ BINS	:= $(addprefix $(O)/, $(BINS))
 
 all: $(BINS)
 
+$(O)/bfish*: bfish.h
 $(O)/%: %.c $(DEPS)
 	@mkdir -p $(@D)
 	@echo "CC	$@"

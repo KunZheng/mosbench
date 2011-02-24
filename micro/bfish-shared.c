@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "bench.h"
+#include "bfish.h"
 
 #define CLINESZ 64
 
@@ -103,51 +104,45 @@ static void * workloop(void *x)
 	switch (nclines) {
 	case 1:
 		for (; shared->go;) {
-			__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b));
+			XOP(b);
 			shared->count[c].v++;
 		}
 		break;
 	case 2:
 		for (; shared->go;) {
-			__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b));
-			__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b + 64));
+			XOP(b);
+			XOP(b + 64);
 			shared->count[c].v++;
 		}
 		break;
 	case 4:
 		for (; shared->go;) {
-			__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b));
-			__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b + 64));
-			__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b + 128));
-			__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b + 192));
+			XOP(b);
+			XOP(b + 64);
+			XOP(b + 128);
+			XOP(b + 192);
 			shared->count[c].v++;
 		}
 		break;
 	case 8:
 		for (; shared->go;) {
-			//prefetchw(b + 64);
-			//prefetchw(b + 128);
-			//prefetchw(b + 256);
-			__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b));
-			__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b + 64));
-			__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b + 128));
-			__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b + 192));
-			//prefetchw(b + 320);
-			//prefetchw(b + 384);
-			//prefetchw(b + 448);
-
-			__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b + 256));
-			__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b + 320));
-			__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b + 384));
-			__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b + 448));
-
+			XOP(b);
+			XOP(b + 64);
+			XOP(b + 128);
+			XOP(b + 192);
+			XOP(b + 256);
+			XOP(b + 320);
+			XOP(b + 384);
+			XOP(b + 448);
 			shared->count[c].v++;
 		}
 		break;
 	default:
 		while (shared->go) {
+			b = shared->clines;
 			for (i = 0; i < nclines; i++) {
-				__asm__ __volatile__("movq %%rax, (%0)" :: "r" (b + (i * CLINESZ)));
+				__asm__ __volatile__("lock; incq %0" : "+m" (*b));
+				b += 64;
 			}
 			shared->count[c].v++;
 		}
@@ -162,7 +157,7 @@ int main(int ac, char **av)
 	int i;
 
 	if (ac != 4)
-		die("usage: %s nthreads nclines the_time\n", av[0]);
+		die("usage: %s nthreads nclines the_time", av[0]);
 	
 	nthreads = atoi(av[1]);
 	nclines = atoi(av[2]);
