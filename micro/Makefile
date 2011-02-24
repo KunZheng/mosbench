@@ -30,7 +30,8 @@ BINS	= memclone \
 	  memmap \
 	  procy \
 	  bfish-shared \
-	  bfish-msg
+	  bfish-msg \
+	  exec-client
 
 BINS	:= $(addprefix $(O)/, $(BINS))
 
