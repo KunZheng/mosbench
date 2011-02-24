@@ -16,6 +16,7 @@
 
 static int nthreads;
 static int nclines;
+static int nsets;
 static int the_time;
 
 static struct {
@@ -31,7 +32,7 @@ static struct {
 
 	volatile int go;
 
-	char *clines;
+	char **clines;
 	
 	uint64_t start;
 } *shared;
@@ -43,15 +44,26 @@ static inline void prefetchw(void *a)
 
 static void initshared(void)
 {
+	int i;
+
 	shared = mmap(0, sizeof(*shared), PROT_READ|PROT_WRITE, 
 		      MAP_SHARED|MAP_ANONYMOUS, 0, 0);
 	if (shared == MAP_FAILED)
-		die("mmap failed\n");
+		die("mmap failed");
 
-	shared->clines = mmap(0, nclines * CLINESZ, PROT_READ|PROT_WRITE, 
+	shared->clines = mmap(0, nsets * sizeof(*shared->clines), 
+			      PROT_READ|PROT_WRITE, 
 			      MAP_SHARED|MAP_ANONYMOUS, 0, 0);
-	if (shared == MAP_FAILED)
-		die("mmap failed\n");
+	if (shared->clines == MAP_FAILED)
+		die("mmap failed");
+
+	for (i = 0; i < nsets; i++) {
+		shared->clines[i] = mmap(0, nclines * CLINESZ, PROT_READ|PROT_WRITE, 
+					 MAP_SHARED|MAP_ANONYMOUS, 0, 0);
+		if (shared->clines[i] == MAP_FAILED)
+			die("mmap failed");
+		memset(shared->clines[i], 0, nclines * CLINESZ);
+	}
 }
 
 static void sighandler(int x)
@@ -82,9 +94,6 @@ static void * workloop(void *x)
 	char *b;
 	
 	setaffinity(c);
-	memset(shared->clines, 0, nclines * CLINESZ);
-
-	b = shared->clines;
 
 	if (c) {
 		while (shared->go == 0)
@@ -102,12 +111,14 @@ static void * workloop(void *x)
 	switch (nclines) {
 	case 1:
 		for (; shared->go;) {
+			b = shared->clines[0];
 			XOP(b);
 			shared->count[c].v++;
 		}
 		break;
 	case 2:
 		for (; shared->go;) {
+			b = shared->clines[0];
 			XOP(b);
 			XOP(b + 64);
 			shared->count[c].v++;
@@ -115,6 +126,7 @@ static void * workloop(void *x)
 		break;
 	case 4:
 		for (; shared->go;) {
+			b = shared->clines[0];
 			XOP(b);
 			XOP(b + 64);
 			XOP(b + 128);
@@ -124,6 +136,7 @@ static void * workloop(void *x)
 		break;
 	case 8:
 		for (; shared->go;) {
+			b = shared->clines[0];
 			XOP(b);
 			XOP(b + 64);
 			XOP(b + 128);
@@ -137,7 +150,7 @@ static void * workloop(void *x)
 		break;
 	default:
 		while (shared->go) {
-			b = shared->clines;
+			b = shared->clines[0];
 			for (i = 0; i < nclines; i++) {
 				XOP(b);
 				b += 64;
@@ -154,12 +167,13 @@ int main(int ac, char **av)
 {
 	int i;
 
-	if (ac != 4)
-		die("usage: %s nthreads nclines the_time", av[0]);
+	if (ac != 5)
+		die("usage: %s nthreads nclines nsets the_time", av[0]);
 	
 	nthreads = atoi(av[1]);
 	nclines = atoi(av[2]);
-	the_time = atoi(av[3]);
+	nsets = atoi(av[3]);
+	the_time = atoi(av[4]);
 
 	setaffinity(0);
 
