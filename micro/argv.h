@@ -9,7 +9,9 @@ struct args {
 	uint64_t	ncores;
 	uint64_t	nprocs;
 	uint64_t	use_threads;
+	uint64_t	coreid;
 	const char 	*sched_op;
+	const char 	*exec_op;
 };
 
 unsigned int argv_parse(int ac, char **av, struct args *args, 
@@ -43,7 +45,9 @@ static struct arg_table {
 	DEFINE_U64_ARG(ncores, NULL),
 	DEFINE_U64_ARG(nprocs, NULL),
 	DEFINE_U64_ARG(use_threads, NULL),
+	DEFINE_U64_ARG(coreid, NULL),
 	DEFINE_STR_ARG(sched_op, "<create-proc|create-thread|yield>"),
+	DEFINE_STR_ARG(exec_op, "<create-proc|create-thread>"),
 
 	{ NULL, NULL, 0, NULL, NULL }
 };
