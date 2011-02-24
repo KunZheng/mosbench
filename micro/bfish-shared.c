@@ -139,7 +139,7 @@ static void * workloop(void *x)
 		while (shared->go) {
 			b = shared->clines;
 			for (i = 0; i < nclines; i++) {
-				__asm__ __volatile__("lock; incq %0" : "+m" (*b));
+				XOP(b);
 				b += 64;
 			}
 			shared->count[c].v++;

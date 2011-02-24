@@ -79,7 +79,7 @@ static void * workloop(void *x)
 	int c = (long)x;
 
 	setaffinity(c);
-	
+
 	for (;shared->go;) {
 		shared->signal[c].v = 1;
 		while (shared->signal[c].v)
@@ -123,7 +123,7 @@ static void do_op(void)
 		break;
 	default:
 		for (i = 0; i < nclines; i++) {
-			__asm__ __volatile__("lock; incq %0" : "+m" (*b));
+			XOP(b);
 			b += 64;
 		}
 		break;
@@ -152,8 +152,7 @@ static void * serverloop(void *x)
 				flag = 1;
 			}
 		}
-		if (flag == 0)
-			__asm __volatile("pause");
+		__asm __volatile("pause");
 	}
 
 	return 0;
@@ -164,7 +163,7 @@ int main(int ac, char **av)
 	int i;
 
 	if (ac != 4)
-		die("usage: %s nthreads nclines the_time\n", av[0]);
+		die("usage: %s nthreads nclines the_time", av[0]);
 	
 	nthreads = atoi(av[1]);
 	nclines = atoi(av[2]);

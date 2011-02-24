@@ -1,6 +1,7 @@
 import subprocess
 import time
 import re
+import os.path
 import os
 
 def get_cpu_ghz():
@@ -148,12 +149,13 @@ class ProcyExec(object):
     def get_name(self):
         return 'procy-exce-%s' % self.execOp
 
-class BFishShared(object):
-    def __init__(self, nclines=1):
+class BFish(object):
+    def __init__(self, nclines=1, bfishCommand='o/bfish-shared'):
         self.nclines = nclines
+        self.bfishCommand = bfishCommand
 
     def run(self, ncores, duration):
-        p = subprocess.Popen(['o/bfish-shared', str(ncores), str(self.nclines), 
+        p = subprocess.Popen([self.bfishCommand, str(ncores), str(self.nclines), 
                               str(duration)],
                              stdout=subprocess.PIPE)
         p.wait()
@@ -163,7 +165,7 @@ class BFishShared(object):
         return float(l.split()[1])
 
     def get_name(self):
-        return 'bfish-shared-%u' % self.nclines
+        return os.path.basename(self.bfishCommand) + '-' + str(self.nclines)
 
 class Exim(object):
     mosbenchPath='/home/sbw/mosbench'

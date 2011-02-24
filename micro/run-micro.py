@@ -5,12 +5,12 @@ import sys
 import re
 import os
 
-START_CORE    = 1
+START_CORE    = 2
 STOP_CORE     = 0
 BENCHMARK     = None
-DURATION      = 15
-NUM_RUNS      = 1
-PRINT_SCALE   = True
+DURATION      = 5
+NUM_RUNS      = 3
+PRINT_SCALE   = False
 
 def usage(argv):
     print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration ] 
@@ -56,17 +56,27 @@ def parse_args(argv):
         usage()
 
     benchmarks = {
-        'fops-dir':    micros.FopsDir,
-        'memclone':    micros.Memclone,
-        'mempop':      micros.Mempop,
-        'memmap':      micros.Memmap,
-        'procy':       micros.Procy,
-        'exim':        micros.Exim,
-        'procy-exec':  micros.ProcyExec
+        'fops-dir':    micros.FopsDir(),
+        'memclone':    micros.Memclone(),
+        'mempop':      micros.Mempop(),
+        'memmap':      micros.Memmap(),
+        'procy':       micros.Procy(),
+        'exim':        micros.Exim(),
+        'procy-exec':  micros.ProcyExec(),
+        'bfish-shared-1': micros.BFish(),
+        'bfish-shared-2': micros.BFish(nclines=2),
+        'bfish-shared-4': micros.BFish(nclines=4),
+        'bfish-shared-8': micros.BFish(nclines=8),
+        'bfish-shared-16': micros.BFish(nclines=16),
+        'bfish-msg-1': micros.BFish(nclines=1, bfishCommand='o/bfish-msg'),
+        'bfish-msg-2': micros.BFish(nclines=2, bfishCommand='o/bfish-msg'),
+        'bfish-msg-4': micros.BFish(nclines=4, bfishCommand='o/bfish-msg'),
+        'bfish-msg-8': micros.BFish(nclines=8, bfishCommand='o/bfish-msg'),
+        'bfish-msg-16': micros.BFish(nclines=16, bfishCommand='o/bfish-msg')
     }
 
     global BENCHMARK
-    BENCHMARK = benchmarks[argv[1]]()
+    BENCHMARK = benchmarks[argv[1]]
 
 def best_run(ncores, duration, nruns):
     tp = 0
