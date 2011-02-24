@@ -129,6 +129,25 @@ class Procy(object):
         else:
             return 'procy-processes-%s' % self.schedOp
 
+class ProcyExec(object):
+    execServer='./exec-server.py'
+
+    def __init__(self, execOp='create-proc'):
+        self.execOp = execOp
+
+    def run(self, ncores, duration):
+        p = subprocess.Popen([self.execServer, str(duration), str(ncores), 
+                              self.execOp],
+                             stdout=subprocess.PIPE)
+        p.wait()
+        if p.returncode:
+            raise Exception('Mempop.run failed: %u' % p.returncode)
+        l = p.stdout.readline().strip()
+        return float(l)
+
+    def get_name(self):
+        return 'procy-exce-%s' % self.execOp
+
 class Exim(object):
     mosbenchPath='/home/sbw/mosbench'
     
