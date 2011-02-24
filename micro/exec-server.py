@@ -7,11 +7,13 @@ import time
 import sys
 import os
 
+EXEC_CLIENT = 'o/exec-client'
+
 def start_clients(count, execOp):
     procs = []
     for i in range(count):
         procs.append(
-            subprocess.Popen(['o/exec-client', '-coreid', str(i),
+            subprocess.Popen([EXEC_CLIENT, '-coreid', str(i),
                               '-exec_op', execOp],
                              stdout = subprocess.PIPE))
         time.sleep(0.05)
@@ -52,8 +54,13 @@ duration = int(sys.argv[1])
 ncores = int(sys.argv[2])
 execOp = sys.argv[3]
 
+# Put ourselves in a new process group so we can broadcast signals
+os.setpgid(0, 0)
 signal.signal(signal.SIGUSR1, signal.SIG_IGN)
 signal.signal(signal.SIGUSR2, signal.SIG_IGN)
+# Get into the right directory
+os.chdir(os.path.dirname(sys.argv[0]))
+
 # start all the clients
 procs = start_clients(ncores, execOp)
 time.sleep(1)
