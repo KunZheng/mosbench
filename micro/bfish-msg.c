@@ -16,9 +16,21 @@
 #define CLINESZ 64
 
 static int nthreads;
+static int nservers;
 static int nclines;
 static int nsets;
 static int the_time;
+
+static int sets_per_server;
+
+union msgbuf {
+	volatile uint64_t v;
+	char __pad[128];
+};
+
+struct signaler {
+	union msgbuf mb[48] __attribute__((aligned(128)));
+};
 
 static struct {
 	union __attribute__((aligned(128))){
@@ -26,10 +38,7 @@ static struct {
 		char __pad[128];
 	} count[48];
 
-	union __attribute__((aligned(128))){
-		volatile uint64_t v;
-		char __pad[128];
-	} signal[48];
+	struct signaler signaler[48];
 
 	volatile int go;
 
@@ -90,12 +99,19 @@ static void sighandler(int x)
 static void * workloop(void *x)
 {
 	int c = (long)x;
+	uint32_t seed;
 
+	seed = c;
 	setaffinity(c);
 
+	while (shared->go == 0)
+		__asm __volatile ("pause");
+
 	for (;shared->go;) {
-		shared->signal[c].v = 1;
-		while (shared->signal[c].v)
+		int server = rnd(&seed) % nservers;
+
+		shared->signaler[server].mb[c].v = 1;
+		while (shared->signaler[server].mb[c].v)
 			__asm __volatile("pause");
 		shared->count[c].v++;
 	}
@@ -103,12 +119,12 @@ static void * workloop(void *x)
 	return 0;
 }
 
-static void do_op(void)
+static void do_op(int set)
 {
 	char *b;
 	int i;
 
-	b = shared->clines[0];
+	b = shared->clines[set];
 
 	switch (nclines) {
 	case 1:
@@ -146,22 +162,35 @@ static void do_op(void)
 static void * serverloop(void *x)
 {
 	int c = (long)x;
+	uint32_t seed;
 	int i, flag;
+	int set_offset;
 
 	setaffinity(c);
+	seed = c;
+	set_offset = c * sets_per_server;
 
-	if (signal(SIGALRM, sighandler) == SIG_ERR)
-		edie("signal failed\n");
-	alarm(the_time);
+	if (c == 0) {
+		if (signal(SIGALRM, sighandler) == SIG_ERR)
+			edie("signal failed\n");
+		alarm(the_time);
 		
-	shared->start = usec();
+		shared->start = usec();
+		shared->go = 1;
+	} else {
+		while (shared->go == 0)
+			__asm __volatile ("pause");
+	}
 
 	for (;shared->go;) {
 		flag = 0;
 		for (i = 0; i < nthreads; i++) {
-			if (shared->signal[i].v) {
-				do_op();
-				shared->signal[i].v = 0;
+			int worker = nservers + i;
+			if (shared->signaler[c].mb[worker].v) {
+				int set = (rnd(&seed) % sets_per_server) + set_offset;
+
+				do_op(set);
+				shared->signaler[c].mb[worker].v = 0;
 				flag = 1;
 			}
 		}
@@ -175,27 +204,37 @@ int main(int ac, char **av)
 {
 	int i;
 
-	if (ac != 5)
-		die("usage: %s nthreads nclines nsets the_time", av[0]);
+	if (ac != 6)
+		die("usage: %s nthreads nservers nclines nsets the_time", av[0]);
 	
 	nthreads = atoi(av[1]);
-	nclines = atoi(av[2]);
-	nsets = atoi(av[3]);
-	the_time = atoi(av[4]);
+	nservers = atoi(av[2]);
+	nclines = atoi(av[3]);
+	nsets = atoi(av[4]);
+	the_time = atoi(av[5]);
+
+	if (nsets % nservers)
+		die("make nservers a multiple of nsets");
+
+	sets_per_server = nsets / nservers;
 
 	setaffinity(0);
 
 	initshared();
-	shared->go = 1;
 
-	for (i = 1; i < nthreads; i++) {
+	for (i = 1; i < nservers; i++) {
 		pthread_t th;
-		if (pthread_create(&th, 0, workloop, (void *)(long)i) < 0)
+		if (pthread_create(&th, 0, serverloop, (void *)(long)i) < 0)
+			edie("pthread_create failed");
+	}
+
+	for (i = 0; i < nthreads; i++) {
+		pthread_t th;
+		if (pthread_create(&th, 0, workloop, (void *)(long)(i + nservers)) < 0)
 			edie("pthread_create failed");
 	}
 
 	sleep(1);
-	shared->signal[0].v = 1;
 	serverloop(0);
 
 	return 0;
