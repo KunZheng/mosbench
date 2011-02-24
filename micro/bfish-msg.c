@@ -56,24 +56,22 @@ static void initshared(void)
 
 static void sighandler(int x)
 {
-	float rate, lat;
+	float rate, sec;
 	uint64_t stop;
 	uint64_t tot;
 	int i;
 
-
 	shared->go = 0;
-	stop = read_tsc();
+	stop = usec();
 
 	tot = 0;
 	for (i = 0; i < 48; i++)
 		tot += shared->count[i].v;
 
-	rate = (float)tot / (float)(stop - shared->start);
-	lat = (float)(stop - shared->start) / (float)shared->count[1].v;
+	sec = (float)(stop - shared->start) / 1000000;
+	rate = (float)tot / sec;
 
-	printf("rate %f per cyc\n", rate);
-	printf("ave lat %f cyc\n", lat);
+	printf("rate %f per sec\n", rate);
 }
 
 static void * workloop(void *x)
@@ -143,7 +141,7 @@ static void * serverloop(void *x)
 		edie("signal failed\n");
 	alarm(the_time);
 		
-	shared->start = read_tsc();
+	shared->start = usec();
 
 	for (;shared->go;) {
 		flag = 0;

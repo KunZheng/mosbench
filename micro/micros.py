@@ -141,12 +141,29 @@ class ProcyExec(object):
                              stdout=subprocess.PIPE)
         p.wait()
         if p.returncode:
-            raise Exception('Mempop.run failed: %u' % p.returncode)
+            raise Exception('ProcyExec.run failed: %u' % p.returncode)
         l = p.stdout.readline().strip()
         return float(l)
 
     def get_name(self):
         return 'procy-exce-%s' % self.execOp
+
+class BFishShared(object):
+    def __init__(self, nclines=1):
+        self.nclines = nclines
+
+    def run(self, ncores, duration):
+        p = subprocess.Popen(['o/bfish-shared', str(ncores), str(self.nclines), 
+                              str(duration)],
+                             stdout=subprocess.PIPE)
+        p.wait()
+        if p.returncode:
+            raise Exception('BFishShared.run failed: %u' % p.returncode)
+        l = p.stdout.readline().strip()
+        return float(l.split()[1])
+
+    def get_name(self):
+        return 'bfish-shared-%u' % self.nclines
 
 class Exim(object):
     mosbenchPath='/home/sbw/mosbench'
