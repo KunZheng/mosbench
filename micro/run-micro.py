@@ -5,11 +5,12 @@ import sys
 import re
 import os
 
-START_CORE    = 0
+START_CORE    = 1
 STOP_CORE     = 0
 BENCHMARK     = None
-DURATION      = 2
-NUM_RUNS      = 3
+DURATION      = 15
+NUM_RUNS      = 1
+PRINT_SCALE   = True
 
 def usage(argv):
     print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration ] 
@@ -60,11 +61,20 @@ def parse_args(argv):
         'mempop':      micros.Mempop,
         'memmap':      micros.Memmap,
         'procy':       micros.Procy,
-        'exim':        micros.Exim
+        'exim':        micros.Exim,
+        'procy-exec':  micros.ProcyExec
     }
 
     global BENCHMARK
     BENCHMARK = benchmarks[argv[1]]()
+
+def best_run(ncores, duration, nruns):
+    tp = 0
+    for x in range(nruns):
+        t = BENCHMARK.run(ncores, duration)
+        if t > tp:
+            tp = t
+    return tp
 
 def main(argv=None):
     if argv is None:
@@ -74,30 +84,38 @@ def main(argv=None):
 
     parse_args(argv)
 
-    maxBase = 0
     minBase = 0
+    maxBase = 0
+    if PRINT_SCALE and START_CORE > 1:
+        minBase = best_run(1, DURATION, NUM_RUNS)
+    if PRINT_SCALE and START_CORE > 2:
+        maxBase = best_run(2, DURATION, NUM_RUNS)
 
     print '# %s' % BENCHMARK.get_name()
     print '# %s %s %s %s %s' % os.uname()
-    print '# cpu\t\tthroughput\tmin scale\tmax scale'
-    for c in range(1, STOP_CORE + 1):
-        tp = 0
-        for x in range(0, NUM_RUNS):
-            t = BENCHMARK.run(c, DURATION)
-            if t > tp:
-                tp = t
+    if PRINT_SCALE:
+        print '# cpu\t\tthroughput\tmin scale\tmax scale'
+    else:
+        print '# cpu\t\tthroughput\t'
+    sys.stdout.flush()
 
-        if c == 1:
-            maxBase = tp
-            minScale = tp / maxBase
+    for c in range(START_CORE, STOP_CORE + 1):
+        tp = best_run(c, DURATION, NUM_RUNS)
+        if PRINT_SCALE and c == 1:
+            minBase = tp
+            minScale = tp / minBase
             print '%u\t%f\t%f' % (c, tp, minScale)
             continue
-        if c == 2:
-            minBase = tp / 2
+        if PRINT_SCALE and c == 2:
+            maxBase = tp / 2
 
-        minScale = tp / maxBase
-        maxScale = tp / minBase
-        print '%u\t%f\t%f\t%f' % (c, tp, minScale, maxScale)
+        if PRINT_SCALE:
+            minScale = tp / minBase
+            maxScale = tp / maxBase
+            print '%u\t%f\t%f\t%f' % (c, tp, minScale, maxScale)
+        else:
+            print '%u\t%f\t' % (c, tp)
+        sys.stdout.flush()
 
 if __name__ == '__main__':
     sys.exit(main())
