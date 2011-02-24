@@ -92,8 +92,11 @@ static void * workloop(void *x)
 	int i;
 	uint64_t gen;
 	char *b;
-	
+	uint32_t seed;
+	int set;
+
 	setaffinity(c);
+	seed = c;
 
 	if (c) {
 		while (shared->go == 0)
@@ -111,14 +114,16 @@ static void * workloop(void *x)
 	switch (nclines) {
 	case 1:
 		for (; shared->go;) {
-			b = shared->clines[0];
+			set = rnd(&seed) % nsets;
+			b = shared->clines[set];
 			XOP(b);
 			shared->count[c].v++;
 		}
 		break;
 	case 2:
 		for (; shared->go;) {
-			b = shared->clines[0];
+			set = rnd(&seed) % nsets;
+			b = shared->clines[set];
 			XOP(b);
 			XOP(b + 64);
 			shared->count[c].v++;
@@ -126,7 +131,8 @@ static void * workloop(void *x)
 		break;
 	case 4:
 		for (; shared->go;) {
-			b = shared->clines[0];
+			set = rnd(&seed) % nsets;
+			b = shared->clines[set];
 			XOP(b);
 			XOP(b + 64);
 			XOP(b + 128);
@@ -136,7 +142,8 @@ static void * workloop(void *x)
 		break;
 	case 8:
 		for (; shared->go;) {
-			b = shared->clines[0];
+			set = rnd(&seed) % nsets;
+			b = shared->clines[set];
 			XOP(b);
 			XOP(b + 64);
 			XOP(b + 128);
@@ -150,7 +157,8 @@ static void * workloop(void *x)
 		break;
 	default:
 		while (shared->go) {
-			b = shared->clines[0];
+			set = rnd(&seed) % nsets;
+			b = shared->clines[set];
 			for (i = 0; i < nclines; i++) {
 				XOP(b);
 				b += 64;
