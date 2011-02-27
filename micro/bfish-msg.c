@@ -21,7 +21,8 @@ static int nclines;
 static int nsets;
 static int the_time;
 
-static int sets_per_server;
+static int set_per_server[48];
+static int server_set_offset[48];
 
 union msgbuf {
 	volatile uint64_t v;
@@ -165,10 +166,13 @@ static void * serverloop(void *x)
 	uint32_t seed;
 	int i, flag;
 	int set_offset;
+	int set_size;
 
 	setaffinity(c);
 	seed = c;
-	set_offset = c * sets_per_server;
+	set_offset = server_set_offset[c];
+	set_size = set_per_server[c];
+	
 
 	if (c == 0) {
 		if (signal(SIGALRM, sighandler) == SIG_ERR)
@@ -187,7 +191,7 @@ static void * serverloop(void *x)
 		for (i = 0; i < nthreads; i++) {
 			int worker = nservers + i;
 			if (shared->signaler[c].mb[worker].v) {
-				int set = (rnd(&seed) % sets_per_server) + set_offset;
+				int set = (rnd(&seed) % set_size) + set_offset;
 
 				do_op(set);
 				shared->signaler[c].mb[worker].v = 0;
@@ -213,10 +217,10 @@ int main(int ac, char **av)
 	nsets = atoi(av[4]);
 	the_time = atoi(av[5]);
 
-	if (nsets % nservers)
-		die("make nservers a multiple of nsets");
-
-	sets_per_server = nsets / nservers;
+	for (i = 0; i < nsets; i++)
+		set_per_server[i % nservers]++;
+	for (i = 1; i < nservers; i++)
+		server_set_offset[i] = set_per_server[i - 1] + server_set_offset[i - 1];
 
 	setaffinity(0);
 

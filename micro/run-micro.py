@@ -5,12 +5,12 @@ import sys
 import re
 import os
 
-START_CORE    = 2
+START_CORE    = 1
 STOP_CORE     = 0
 BENCHMARK     = None
 DURATION      = 5
 NUM_RUNS      = 3
-PRINT_SCALE   = False
+PRINT_SCALE   = True
 
 def usage(argv):
     print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration ] 

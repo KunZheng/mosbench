@@ -150,14 +150,22 @@ class ProcyExec(object):
         return 'procy-exce-%s' % self.execOp
 
 class BFish(object):
-    def __init__(self, nclines=1, bfishCommand='o/bfish-shared'):
+    def __init__(self, nclines=1, nsets=128, bfishCommand='o/bfish-shared'):
         self.nclines = nclines
+        self.nsets = nsets
         self.bfishCommand = bfishCommand
 
     def run(self, ncores, duration):
-        p = subprocess.Popen([self.bfishCommand, str(ncores), str(self.nclines), 
-                              str(duration)],
-                             stdout=subprocess.PIPE)
+        args = []
+        if self.bfishCommand.find('msg') != -1:
+            args = [self.bfishCommand, str(ncores), str(ncores), 
+                    str(self.nclines), 
+                    str(self.nsets), str(duration)]
+        else:
+            args = [self.bfishCommand, str(ncores), str(self.nclines), 
+                    str(self.nsets), str(duration)]
+
+        p = subprocess.Popen(args, stdout=subprocess.PIPE)
         p.wait()
         if p.returncode:
             raise Exception('BFishShared.run failed: %u' % p.returncode)
