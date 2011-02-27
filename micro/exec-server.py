@@ -14,7 +14,8 @@ def start_clients(count, execOp):
     for i in range(count):
         procs.append(
             subprocess.Popen([EXEC_CLIENT, '-coreid', str(i),
-                              '-exec_op', execOp],
+                              '-exec_op', execOp,
+                              '-mtrace_captain', str(1 if i == 0 else 0)],
                              stdout = subprocess.PIPE))
         time.sleep(0.05)
     return procs
@@ -44,7 +45,7 @@ def timed_wait(timeout):
         signal.alarm(0)
 
 def usage():
-    print >> sys.stderr, "Usage: %s time ncores exec_op" % sys.argv[0]
+    print >> sys.stderr, "Usage: %s time ncores exec_op [ exec-client ] " % sys.argv[0]
     sys.exit(2)
 
 if len(sys.argv) < 4:
@@ -53,6 +54,9 @@ if len(sys.argv) < 4:
 duration = int(sys.argv[1])
 ncores = int(sys.argv[2])
 execOp = sys.argv[3]
+
+if len(sys.argv) > 4:
+    EXEC_CLIENT = sys.argv[4]
 
 # Put ourselves in a new process group so we can broadcast signals
 os.setpgid(0, 0)

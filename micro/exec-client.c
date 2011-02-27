@@ -2,6 +2,8 @@
  * Bind to a core, perform some operation
  */
 
+#define TESTNAME "exec_client"
+
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -19,6 +21,7 @@
 #include <pthread.h>
 
 #include "bench.h"
+#include "support/mtrace.h"
 #include "gemaphore.h"
 #include "argv.h"
 
@@ -29,11 +32,11 @@ static uint64_t start;
 static struct args the_args = {
 	.coreid = 1,
 	.exec_op = "create-proc",
+	.mtrace_captain = 0
 };
 
 static const char *valid_args[] = 
-       { "coreid", "exec_op", NULL };
-
+       { "coreid", "exec_op", "mtrace_captain", NULL };
 
 static void *null_worker(void *x)
 {
@@ -76,6 +79,8 @@ static void __noret__ print_result(int x)
 	float rate;
 	float sec;
 
+	mtrace_enable_set(0, TESTNAME);
+
 	stop = usec();
 	sec = (float)(stop - start) / 1000000;
 	rate = (float)op_count / sec;
@@ -88,6 +93,8 @@ static void reset(int x)
 {
 	op_count = 0;
 	start = usec();
+	if (the_args.mtrace_captain)
+		mtrace_enable_set(1, TESTNAME);
 }
 
 int main(int ac, char **av)
