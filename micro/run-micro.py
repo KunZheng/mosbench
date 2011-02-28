@@ -63,6 +63,7 @@ def parse_args(argv):
         'procy':       micros.Procy(),
         'exim':        micros.Exim(),
         'procy-exec':  micros.ProcyExec(),
+        'pagecache':   micros.Pagecache(),
         'bfish-shared-1': micros.BFish(),
         'bfish-shared-2': micros.BFish(nclines=2),
         'bfish-shared-4': micros.BFish(nclines=4),

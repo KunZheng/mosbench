@@ -175,6 +175,24 @@ class BFish(object):
     def get_name(self):
         return os.path.basename(self.bfishCommand) + '-' + str(self.nclines)
 
+class Pagecache(object):
+    def __init__(self, fileSize=268435456, baseFilename='/tmp'):
+        self.fileSize = fileSize
+        self.baseFilename = baseFilename
+
+    def run(self, ncores, duration):
+        p = subprocess.Popen(['o/pagecache', str(ncores), self.baseFilename,
+                              str(self.fileSize)],
+                             stdout=subprocess.PIPE)
+        p.wait()
+        if p.returncode:
+            raise Exception('Pagecache.run failed: %u' % p.returncode)
+        l = p.stdout.readline().strip()
+        return float(l)
+
+    def get_name(self):
+        return 'pagecache-%lu' % self.fileSize
+
 class Exim(object):
     mosbenchPath='/home/sbw/mosbench'
     
