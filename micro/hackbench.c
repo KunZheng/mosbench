@@ -1,3 +1,5 @@
+/* http://devresources.linux-foundation.org/craiger/hackbench/ */
+
 /* Test groups of 20 processes spraying to 20 receivers */
 #include <sys/types.h>
 #include <sys/socket.h>
