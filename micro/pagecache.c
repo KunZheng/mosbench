@@ -117,10 +117,13 @@ static void xwrite(int fd, const void *buf, size_t count)
 
 static void waitup(void)
 {
+	struct mtrace_appdata_entry entry;
 	unsigned int i;
+	uint64_t tot;
 	float rate;
 
 	rate = 0.0;
+	tot = 0;
 	for (i = 0; i < ncores; i++) {
 		float r;
 
@@ -128,8 +131,12 @@ static void waitup(void)
 			nop_pause();
 		
 		r = (float)shared->count[i].v / (float)shared->count[i].usecs;
+		tot += shared->count[i].v;
 		rate += r;
 	}
+	entry.u64 = tot;
+	mtrace_appdata_register(&entry);
+	mtrace_enable_set(0, TESTNAME);
 
 	rate = rate * 1000000.0;
 	printf("%f\n", rate);
