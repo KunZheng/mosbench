@@ -6,7 +6,7 @@ import re
 import os
 
 START_CORE    = 1
-STOP_CORE     = 0
+STOP_CORE     = 48
 BENCHMARK     = None
 DURATION      = 5
 NUM_RUNS      = 3
@@ -100,7 +100,7 @@ def main(argv=None):
     if PRINT_SCALE and START_CORE > 1:
         minBase = best_run(1, DURATION, NUM_RUNS)
     if PRINT_SCALE and START_CORE > 2:
-        maxBase = best_run(2, DURATION, NUM_RUNS)
+        maxBase = best_run(2, DURATION, NUM_RUNS) / 2
 
     print '# %s' % BENCHMARK.get_name()
     print '# %s %s %s %s %s' % os.uname()

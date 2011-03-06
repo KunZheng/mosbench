@@ -33,7 +33,8 @@ BINS	= memclone \
 	  bfish-msg \
 	  exec-client \
 	  hackbench \
-	  pagecache
+	  pagecache \
+	  nety
 
 BINS	:= $(addprefix $(O)/, $(BINS))
 

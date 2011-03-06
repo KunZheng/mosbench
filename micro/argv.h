@@ -12,6 +12,7 @@ struct args {
 	uint64_t	coreid;
 	uint64_t 	mtrace_captain;
 	const char 	*sched_op;
+	const char 	*net_op;
 	const char 	*exec_op;
 };
 
@@ -49,6 +50,7 @@ static struct arg_table {
 	DEFINE_U64_ARG(coreid, NULL),
 	DEFINE_U64_ARG(mtrace_captain, NULL),
 	DEFINE_STR_ARG(sched_op, "<create-proc|create-thread|yield>"),
+	DEFINE_STR_ARG(net_op, "<tcp-ping>"),
 	DEFINE_STR_ARG(exec_op, "<create-proc|create-thread>"),
 
 	{ NULL, NULL, 0, NULL, NULL }
