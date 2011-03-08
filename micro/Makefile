@@ -34,7 +34,8 @@ BINS	= memclone \
 	  exec-client \
 	  hackbench \
 	  pagecache \
-	  nety
+	  nety \
+	  socko
 
 BINS	:= $(addprefix $(O)/, $(BINS))
 

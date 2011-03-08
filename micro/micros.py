@@ -31,11 +31,10 @@ class FopsDir(object):
         return 'fops-dir'
 
 class Memclone(object):
-    useThreads = 0
     mbytes = 200
 
-    def __init__(self):
-        pass
+    def __init__(self, useThreads=0):
+        self.useThreads = useThreads
 
     def run(self, ncores, duration):
         p = subprocess.Popen(["o/memclone", str(ncores), str(self.mbytes),
@@ -76,6 +75,27 @@ class Memmap(object):
             return 'memmap-threads-%u' % self.kbytes
         else:
             return 'memmap-processes-%u' % self.kbytes
+
+class Nety(object):
+
+    def __init__(self):
+        pass
+
+    def run(self, ncores, duration):
+        p = subprocess.Popen(["o/nety", 
+                              '-time', str(duration), 
+                              '-ncores', str(ncores), 
+                              '-net_op', 'tcp-ping'],
+                             stdout=subprocess.PIPE)
+        p.wait()
+        if p.returncode:
+            raise Exception('Nety.run failed: %u' % p.returncode)
+        l = p.stdout.readline().strip()
+        m = re.search('rate: (\d+\.\d+) per sec', l)
+        return float(m.group(1))
+
+    def get_name(self):
+        return 'nety'
 
 class Mempop(object):
     useThreads = 0
