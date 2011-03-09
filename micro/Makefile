@@ -34,7 +34,8 @@ BINS	= memclone \
 	  exec-client \
 	  hackbench \
 	  pagecache \
-	  nety \
+	  tcpee \
+	  udpee \
 	  socko \
 	  creato
 
