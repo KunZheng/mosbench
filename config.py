@@ -1,3 +1,5 @@
+NUM_CORES=12
+
 from mparts.configspace import ConfigSpace
 
 import hosts
@@ -65,7 +67,7 @@ shared *= mk(hotplug = True)
 # configuration for the graphing tools to work (which also means it
 # generally shouldn't be overridden per benchmark).
 if sanityRun:
-    shared *= mk(cores = [2], nonConst = True)
+    shared *= mk(cores = [NUM_CORES], nonConst = True)
 else:
     shared *= mk(cores = [1] + range(0, 49, 4)[1:], nonConst = True)
 
@@ -86,7 +88,7 @@ exim = mk(benchmark = exim.runner, nonConst = True)
 
 exim *= mk(eximBuild = "exim-mod")
 exim *= mk(eximPort = 2526)
-exim *= mk(clients = 8)
+exim *= mk(clients = 96)
 exim *= mk(numInstances = 1)
 
 ##################################################################
