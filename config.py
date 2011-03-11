@@ -35,14 +35,14 @@ shared *= mk(benchRoot = "/home/sbw/mosbench")
 # to use for the Psearchy indexing benchmark can be found.  To
 # reproduce the results in the paper, this should be a pristine check
 # out of Linux 2.6.35-rc5.
-shared *= mk(textRoot = "~/scale-linux/ipc")
+shared *= mk(textRoot = "/home/sbw/scale-linux/ipc")
 
 # kernelRoot specifies the directory on the primary host where the
 # kernel source to use for the gmake benchmark can be found.  To
 # reproduce the results in the paper, this should be a check out of
 # Linux 2.6.35-rc5.  This can be the same directory used for textRoot
 # above.
-shared *= mk(kernelRoot = "~/scale-linux")
+shared *= mk(kernelRoot = "/home/sbw/scale-linux")
 
 # fs specifies which type of file system to use.  This can be any file
 # system type known to mkmounts except hugetlbfs.
@@ -271,9 +271,9 @@ metis *= mk(order = ["rr"])
 #configSpace = memcached.merge(shared)
 #configSpace = apache.merge(shared)
 #configSpace = postgres.merge(shared)
-configSpace = gmake.merge(shared)
+#configSpace = gmake.merge(shared)
 #configSpace = psearchy.merge(shared)
-#configSpace = metis.merge(shared)
+configSpace = metis.merge(shared)
 
 ##################################################################
 # Run

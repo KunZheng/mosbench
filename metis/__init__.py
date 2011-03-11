@@ -39,7 +39,7 @@ class MetisLoad(Task, ResultsProvider):
         obj = os.path.join(self.metisPath, "obj." + self.model)
         cmd = [os.path.join(obj, "app",
                             "wrmem" + (".sf" if self.streamflow else "")),
-               "-p", str(self.cores)]
+               "-p", str(self.cores), '-s', '128']
         cmd = self.sysmon.wrap(cmd, "Starting mapreduce", "Finished mapreduce")
         addEnv = {"LD_LIBRARY_PATH" : os.path.join(obj, "lib"),
                   "CPUSEQ" : cpuseq}
