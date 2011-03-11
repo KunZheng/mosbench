@@ -48,7 +48,7 @@ class GmakeLoad(Task, ResultsProvider, SourceFileProvider):
         # with the first "  CC" line.
         #self.host.r.run(self.sysmon.wrap(self.__cmd("vmlinux.o")),
         #                stdout = logPath)
-        self.host.r.run(self.sysmon.wrap(self.__cmd(ipc)),
+        self.host.r.run(self.sysmon.wrap(self.__cmd('ipc')),
                         stdout = logPath)
 
 
