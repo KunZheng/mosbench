@@ -1,4 +1,4 @@
-NUM_CORES=12
+NUM_CORES=4
 
 from mparts.configspace import ConfigSpace
 
@@ -35,7 +35,7 @@ shared *= mk(benchRoot = "/home/sbw/mosbench")
 # to use for the Psearchy indexing benchmark can be found.  To
 # reproduce the results in the paper, this should be a pristine check
 # out of Linux 2.6.35-rc5.
-shared *= mk(textRoot = "~/scale-linux")
+shared *= mk(textRoot = "~/scale-linux/ipc")
 
 # kernelRoot specifies the directory on the primary host where the
 # kernel source to use for the gmake benchmark can be found.  To
@@ -267,11 +267,11 @@ metis *= mk(order = ["rr"])
 # left will override assignments to the same variables from the right.
 #configSpace = ((exim + memcached + apache + postgres + gmake + psearchy + metis)
 #               .merge(shared))
-configSpace = exim.merge(shared)
+#configSpace = exim.merge(shared)
 #configSpace = memcached.merge(shared)
 #configSpace = apache.merge(shared)
 #configSpace = postgres.merge(shared)
-#configSpace = gmake.merge(shared)
+configSpace = gmake.merge(shared)
 #configSpace = psearchy.merge(shared)
 #configSpace = metis.merge(shared)
 
