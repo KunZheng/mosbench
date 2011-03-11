@@ -25,14 +25,15 @@ import os
 # Config
 #BENCHMARK     = micros.Exim(logPath=('historical-log/%u-log' % os.getpid()))
 #BENCHMARK     = micros.Procy(schedOp='yield')
-BENCHMARK     = micros.FopsDir(baseFileName='/root/tmp/foo')
-ENABLE        = False
+#BENCHMARK     = micros.FopsDir(baseFileName='/root/tmp/foo')
+BENCHMARK       = micros.Mempop()
+ENABLE         = True
 
 # Other knobs
 GREBOOT       = '/home/sbw/local/bin/greboot'
 RESULT_BASE   = 'bisect-results'
-START_CORE    = 20
-STOP_CORE     = 20
+START_CORE    = 12
+STOP_CORE     = 12
 DURATION      = 5
 NUM_RUNS      = 3
 DELAY         = 10
@@ -85,7 +86,8 @@ class MinimumResult(object):
         else:
             return 'BAD (minimum): no value greater than %f' % self.lowerBound
 
-RESULT = UpperBoundResult(10000000.0)
+RESULT = UpperBoundResult(1000000.0)
+#RESULT = MinimumResult(190000.0)
 
 def usage(argv):
     print '''Usage: %s benchmark-name [ -start start -stop stop -duration duration
@@ -284,6 +286,9 @@ class BisectHelper(object):
             if line.find('DEPMOD') != -1:
                 vals = line.split()
                 version = vals[1]
+            elif line.find('install.sh') != -1:
+                vals = line.split()
+                version = vals[2]
 
         p.wait()
         if p.returncode:
@@ -399,7 +404,7 @@ def main(argv=None):
             break;
         except BisectHelper.BuildException as e:
             print 'oops, build failed: %s\r\n' % e.value,
-            if buildTries > 3:
+            if buildTries > 20:
                 print 'too many broken builds, giving up...\r\n'
                 gitLog.write('* Too many broken builds *\n')
                 gitLog.close()
