@@ -39,7 +39,8 @@ BINS	= memclone \
 	  socko \
 	  creato
 
-BINS	:= $(addprefix $(O)/, $(BINS))
+LIBS	= bench.c
+DEPS	= bench.h config.h list.h $(LIBS) $(MTRACEDEP) $(SUPPORT)/mtrace.h
 
 all: $(BINS)
 
