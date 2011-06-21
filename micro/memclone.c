@@ -2,11 +2,14 @@
  * Create threads, touch memory, and cause the kernel to demand allocate pages.
  */
 
+#define TESTNAME "memclone"
+
 #include <sys/mman.h>
 #include <stdio.h>
 #include <pthread.h>
 
 #include "bench.h"
+#include "support/mtrace.h"
 
 static struct {
     volatile int start;
@@ -45,6 +48,7 @@ worker(void *x)
 			nop_pause();
 	else {
 		start = usec();
+		mtrace_enable_set(1, TESTNAME);
 		sync_state->start = 1;
 	}	
 
@@ -58,6 +62,7 @@ worker(void *x)
 
 static void waitup(void)
 {
+	struct mtrace_appdata_entry entry;
 	uint64_t ave_pf, max_pf;
 	uint64_t tot, max;
 	uint64_t size;
@@ -75,6 +80,10 @@ static void waitup(void)
 		if (sync_state->cpu[i].cycle > max)
 			max = sync_state->cpu[i].cycle;
 	}
+
+	entry.u64 = tot;
+	mtrace_appdata_register(&entry);
+	mtrace_enable_set(0, TESTNAME);
 
 	end = usec();
 

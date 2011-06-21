@@ -2,7 +2,7 @@
  * Create task per-core, each task does something
  */
 
-#define TESTNAME "nety"
+#define TESTNAME "tcpee"
 
 #include <sys/mman.h>
 #include <sys/types.h>
