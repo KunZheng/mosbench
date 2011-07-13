@@ -1,3 +1,6 @@
+-include ../config.mk
+SUPPORT = ../support
+
 OBJDIRS :=
 Q	:= @
 CC     := gcc
@@ -44,7 +47,7 @@ INCLUDES := -I$(TOP) -I$(TOP)/lib
 CFLAGS	:= -std=c99 -fms-extensions -D_GNU_SOURCE -Wall $(OPTFLAG) \
 	   -D_X86_64_ $(INCLUDES) -DJTLS=__thread -DJSHARED_ATTR=  \
 	   -DJOS_CLINE=64 -DCACHE_LINE_SIZE=64 -MD $(SF_MMOPT) 	   \
-	   -DJOS_NCPU=$(MAXCPUS) -fno-omit-frame-pointer
+	   -DJOS_NCPU=$(MAXCPUS) -fno-omit-frame-pointer $(MTRACE_CFLAGS)
 
 COMMON_LIB := -lc -lm -lpthread -lrt
 LIB	   := -L$(O)/lib -lmetis $(COMMON_LIB) 

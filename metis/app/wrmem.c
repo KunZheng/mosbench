@@ -40,6 +40,8 @@
 #include "mr-sched.h"
 #include "bench.h"
 
+#include "../../support/mtrace.h"
+
 #define DEFAULT_NDISP 10
 
 enum { max_key_len = 1024 };
@@ -254,10 +256,12 @@ main(int argc, char *argv[])
 	return 0;
     printf("Starting mapreduce\n");
     fflush(stdout);
+    mtrace_enable_set(1, "wrmem");
     do_mapreduce(nprocs, map_tasks, reduce_tasks, fdata, inputsize, &wr_val);
+    mtrace_enable_set(0, "wrmem");
     printf("Finished mapreduce\n");
     fflush(stdout);
-    mr_print_stats();
+    //mr_print_stats();
     if (!quiet)
 	print_top(&wr_val, ndisp);
     mr_finalize();
