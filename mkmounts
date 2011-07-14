@@ -126,8 +126,8 @@ case $1 in
             echo "Failed to parse Hugepagesize from /proc/meminfo" >&2
             exit 1
         fi
-        # Allocate 20 gigs of huge pages
-        pages=$(expr 20 \* 1024 \* 1024 / $pagesize)
+        # Allocate 1 gig of huge pages
+        pages=$(expr 1024 \* 1024 / $pagesize)
         havepages=$(cat /proc/sys/vm/nr_hugepages)
 
         if [ $UNMOUNT ]; then
