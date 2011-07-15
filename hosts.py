@@ -25,10 +25,11 @@ from mparts.host import Host
 from support import perfLocked
 from memcached import MemcachedHost
 import support.rsshash as rsshash
+from socket import getfqdn
 
 # Use "cmdModifier = perfLocked" if you use the "perflock" script to
 # prevent conflicting machine access.  You probably don't.
-tom = Host("tom.lcs.mit.edu")
+tom = Host(getfqdn())
 
 clientHosts = ["josmp.csail.mit.edu",
                "oc-5.csail.mit.edu", "oc-6.csail.mit.edu",
