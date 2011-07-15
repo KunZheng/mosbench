@@ -2,8 +2,8 @@
 
 import sys, os, signal, subprocess, errno, time
 
-WARMUP = 3
-DURATION = 10
+WARMUP = 1
+DURATION = 3
 
 CORES = file("/proc/cpuinfo").read().count("processor\t")
 
@@ -79,7 +79,7 @@ def stopCounting(procs):
         # skewed and screwed.  This is mostly a safeguard to catch
         # misbehaving children.  The IOError will kill this process,
         # which will kill the children.
-        signal.alarm(1)
+        signal.alarm(3)
         res = p.stdout.readline()
         signal.alarm(0)
         total += int(res.split()[0])
