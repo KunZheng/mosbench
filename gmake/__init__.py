@@ -8,6 +8,8 @@ import os
 
 __all__ = []
 
+BENCHMARK = "ipc"
+
 __all__.append("GmakeLoad")
 class GmakeLoad(Task, ResultsProvider, SourceFileProvider):
     __info__ = ["host", "srcPath", "objPath", "*sysmonOut"]
@@ -46,7 +48,7 @@ class GmakeLoad(Task, ResultsProvider, SourceFileProvider):
         # XXX If we want to eliminate the serial startup, monitor
         # starting with "  CHK include/generated/compile.h" or maybe
         # with the first "  CC" line.
-        self.host.r.run(self.sysmon.wrap(self.__cmd("vmlinux.o")),
+        self.host.r.run(self.sysmon.wrap(self.__cmd("mosbench-gmake-" + BENCHMARK)),
                         stdout = logPath)
 
         # Get result
@@ -70,7 +72,8 @@ class GmakeRunner(object):
         # pre-build of init/main.o, eliminates virtually all disk
         # reads.  For the rest, we'll just have to rely on multiple
         # trials or at least multiple configurations to cache.
-        m += PrefetchDir(host, cfg.kernelRoot, ["*/.git"])
+        m += PrefetchDir(host, os.path.join(cfg.kernelRoot, BENCHMARK), ["*/.git"])
+        m += PrefetchDir(host, os.path.join(cfg.kernelRoot, "scripts"), ["*/.git"])
         if cfg.hotplug:
             m += SetCPUs(host = host, num = cfg.cores)
         sysmon = SystemMonitor(host)
