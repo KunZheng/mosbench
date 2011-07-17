@@ -1,8 +1,10 @@
 #!/usr/bin/python
 
-import sys, os, time, subprocess, operator
+import sys, os, time, subprocess, operator, re
 
 SC_CLK_TCK = float(os.sysconf("SC_CLK_TCK"))
+# Get the X in 2.6.X-blah-blah
+LINUX_VERSION = int(re.sub('[^0-9]', '', os.uname()[2].split('.')[2]))
 
 def usage():
     print >> sys.stderr, "Usage: %s [-mtrace name] [-s start] [-e end] [cmd...]" % sys.argv[0]
@@ -24,7 +26,9 @@ def vadd(a, b):
 class TimeMonitor(object):
     COLS = ["real", "user", "nice", "sys", "idle",
             "iowait", "irq", "softirq",
-            "steal", "guest"]
+            "steal"]
+    if LINUX_VERSION >= 24:
+        COLS.append("guest");
 
     def __init__(self):
         self.__f = file("/proc/stat", "r", 0)
