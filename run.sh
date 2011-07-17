@@ -24,6 +24,12 @@ case "$1" in
 	(cd $ROOT && ./mkmounts hugetlb 0 0)
 	(cd $ROOT && make bench)
 	;;
+
+    gmake)
+	make_config "gmake"
+	(cd $ROOT && ./mkmounts tmpfs-separate 0 0)
+	(cd $ROOT && make bench)
+	;;
     *)
 	echo "ERROR: unknown $1"
 	exit 2
