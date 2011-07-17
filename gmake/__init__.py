@@ -48,8 +48,8 @@ class GmakeLoad(Task, ResultsProvider, SourceFileProvider):
         # XXX If we want to eliminate the serial startup, monitor
         # starting with "  CHK include/generated/compile.h" or maybe
         # with the first "  CC" line.
-        self.host.r.run(self.sysmon.wrap(self.__cmd("mosbench-gmake-" + BENCHMARK)),
-                        stdout = logPath)
+        self.host.r.run(self.sysmon.wrap(self.__cmd("mosbench-gmake-" + BENCHMARK),
+                                         mtraceName="gmake"), stdout = logPath)
 
         # Get result
         log = self.host.r.readFile(logPath)
