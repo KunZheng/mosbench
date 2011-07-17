@@ -33,7 +33,7 @@ shared *= mk(benchRoot = "/home/sbw/mosbench")
 # to use for the Psearchy indexing benchmark can be found.  To
 # reproduce the results in the paper, this should be a pristine check
 # out of Linux 2.6.35-rc5.
-shared *= mk(textRoot = "~/scale-linux")
+shared *= mk(textRoot = "/home/sbw/linux-2.6/ipc")
 
 # kernelRoot specifies the directory on the primary host where the
 # kernel source to use for the gmake benchmark can be found.  To
@@ -221,8 +221,7 @@ import psearchy
 psearchy = mk(benchmark = psearchy.runner, nonConst = True)
 
 if sanityRun:
-    psearchy *= (mk(mode = ["thread"]) * mk(order = ["seq"]) +
-                 mk(mode = ["process"]) * mk(order = ["rr"]))
+    psearchy *= (mk(mode = ["process"]) * mk(order = ["rr"]))
 else:
     psearchy *= (mk(mode = ["thread"]) * mk(order = ["seq"]) +
                  mk(mode = ["process"]) * mk(order = ["seq", "rr"]))
