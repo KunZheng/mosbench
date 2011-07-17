@@ -40,7 +40,7 @@ shared *= mk(textRoot = "~/scale-linux")
 # reproduce the results in the paper, this should be a check out of
 # Linux 2.6.35-rc5.  This can be the same directory used for textRoot
 # above.
-shared *= mk(kernelRoot = "~/scale-linux")
+shared *= mk(kernelRoot = "/home/sbw/linux-2.6")
 
 # fs specifies which type of file system to use.  This can be any file
 # system type known to mkmounts except hugetlbfs.
@@ -65,7 +65,7 @@ shared *= mk(hotplug = True)
 # configuration for the graphing tools to work (which also means it
 # generally shouldn't be overridden per benchmark).
 if sanityRun:
-    shared *= mk(cores = [2], nonConst = True)
+    shared *= mk(cores = [4], nonConst = True)
 else:
     shared *= mk(cores = [1] + range(0, 49, 4)[1:], nonConst = True)
 
@@ -246,7 +246,8 @@ import metis
 metis = mk(benchmark = metis.runner, nonConst = True)
 
 metis *= mk(streamflow = True)
-metis *= mk(model = ["hugetlb", "default"])
+#metis *= mk(model = ["hugetlb", "default"])
+metis *= mk(model = ["hugetlb"])
 metis *= mk(order = ["rr"])
 
 ##################################################################
@@ -265,11 +266,11 @@ metis *= mk(order = ["rr"])
 # left will override assignments to the same variables from the right.
 #configSpace = ((exim + memcached + apache + postgres + gmake + psearchy + metis)
 #               .merge(shared))
-configSpace = exim.merge(shared)
+#configSpace = exim.merge(shared)
 #configSpace = memcached.merge(shared)
 #configSpace = apache.merge(shared)
 #configSpace = postgres.merge(shared)
-#configSpace = gmake.merge(shared)
+configSpace = gmake.merge(shared)
 #configSpace = psearchy.merge(shared)
 #configSpace = metis.merge(shared)
 

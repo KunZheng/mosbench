@@ -5,7 +5,7 @@ import sys, os, time, subprocess, operator
 SC_CLK_TCK = float(os.sysconf("SC_CLK_TCK"))
 
 def usage():
-    print >> sys.stderr, "Usage: %s [-s start] [-e end] [cmd...]" % sys.argv[0]
+    print >> sys.stderr, "Usage: %s [-mtrace name] [-s start] [-e end] [cmd...]" % sys.argv[0]
     print >> sys.stderr
     print >> sys.stderr, """\
 Monitor the system while running the given command.  If no command is
@@ -64,14 +64,28 @@ class TimeMonitor(object):
             out.extend([c, "%g" % d])
         return " ".join(out)
 
+class Mtrace(object):
+    def __init__(self, name, cmd="mtrace-magic"):
+        self.cmd = cmd
+        self.name = name
+
+    def start(self):
+        subprocess.check_call([self.cmd, "enable", self.name])
+
+    def stop(self):
+        subprocess.check_call([self.cmd, "disable", self.name])        
+
 args = sys.argv[1:]
 start = end = proc = None
+mtrace = None
 while args and args[0].startswith("-"):
     arg = args.pop(0)
     if arg == "-s" and args:
         start = args.pop(0)
     elif arg == "-e" and args:
         end = args.pop(0)
+    elif arg == "-mtrace" and args:
+        mtrace = Mtrace(args.pop(0))
     else:
         usage()
 triggers = [start, end]
@@ -86,6 +100,8 @@ else:
 m = TimeMonitor()
 if start == None:
     m.start()
+if mtrace:
+    mtrace.start()
 while True:
     l = f.readline()
     if not l:
@@ -98,6 +114,8 @@ while True:
         m.stop()
         triggers[1] = None
     sys.stdout.flush()
+if mtrace:
+    mtrace.stop()
 if end == None:
     m.stop()
 
