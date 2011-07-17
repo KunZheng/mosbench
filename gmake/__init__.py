@@ -74,6 +74,8 @@ class GmakeRunner(object):
         # trials or at least multiple configurations to cache.
         m += PrefetchDir(host, os.path.join(cfg.kernelRoot, BENCHMARK), ["*/.git"])
         m += PrefetchDir(host, os.path.join(cfg.kernelRoot, "scripts"), ["*/.git"])
+        m += PrefetchDir(host, os.path.join(cfg.kernelRoot, "arch",
+                                            "x86", "include"), ["*/.git"])
         if cfg.hotplug:
             m += SetCPUs(host = host, num = cfg.cores)
         sysmon = SystemMonitor(host)
