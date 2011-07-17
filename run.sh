@@ -30,6 +30,13 @@ case "$1" in
 	(cd $ROOT && ./mkmounts tmpfs-separate 0 0)
 	(cd $ROOT && make bench)
 	;;
+
+    psearchy)
+	make_config "psearchy"
+	(cd $ROOT && ./mkmounts tmpfs-separate 0 0)
+	(cd $ROOT && make bench)
+	;;
+
     *)
 	echo "ERROR: unknown $1"
 	exit 2
