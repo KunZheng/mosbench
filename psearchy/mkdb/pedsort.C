@@ -31,6 +31,8 @@
 #include <set>
 #include <vector>
 
+#include "../../support/mtrace.h"
+
 // #define COUNTER
 
 const char *tmpdir;
@@ -326,6 +328,7 @@ main(int argc, char *argv[])
 
 
   printrusage(1);
+  mtrace_enable_set(1, "psearchy");
 
   tmpdir = "/tmp";
   if(getenv("TMPDIR"))
@@ -486,6 +489,7 @@ main(int argc, char *argv[])
   printf("tot = %llu\n", (unsigned long long)shared->tot);
 #endif
 
+  mtrace_enable_set(0, "psearchy");
   fprintf(stdout, "%d: ", ncore);
   float r = printrusage(0);
   fprintf(stdout, " throughput: %f jobs/hour/core", ((60*60)  / r) / ncore);

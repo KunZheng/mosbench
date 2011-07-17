@@ -1,4 +1,7 @@
-CXXFLAGS := -O2 -Wall -MD # -g -fno-omit-frame-pointer
+-include ../../config.mk
+SUPPORT = ../support
+
+CXXFLAGS := -O2 -Wall -MD $(MTRACE_CFLAGS) # -g -fno-omit-frame-pointer
 #CXXFLAGS += -I$(LDB)
 #LDFLAGS += -L/Users/kaashoek/hack/db-4.7.25.NC/build_unix/
 #LDFLAGS += -pg -lprofiler
