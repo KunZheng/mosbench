@@ -70,7 +70,7 @@ primaryHost = tom
 # for Postgres is nowhere near that of Apache or memcached.  This host
 # must have the Postgres client library installed (libpq-dev on
 # Debian/Ubuntu).
-postgresClient = clients["josmp"]
+postgresClient = Host("ud0.csail.mit.edu", namePrefix = "postgresClient")
 
 # Memcached uses a large set of clients, very carefully chosen to
 # maximize load.  It turns out we have just enough clients to hit the

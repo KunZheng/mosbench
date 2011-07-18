@@ -181,7 +181,7 @@ class PostgresRunner(object):
         # Since we only have cfg.cores flows, make sure a sequential
         # assignment spans all the online cores.  However, this does
         # not spread things out if we have more queues than cores.
-        m += IXGBE(host, "eth0", queues = "n%min(NCPU, NRX if rx else NTX)")
+#        m += IXGBE(host, "eth0", queues = "n%min(NCPU, NRX if rx else NTX)")
 
         sysmon = ExplicitSystemMonitor(host)
         m += sysmon

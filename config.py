@@ -190,7 +190,7 @@ pgstock = (mk(sleep = "sysv") * mk(semasPerSet = 16) *
            mk(lwScale = False) * mk(lockScale = False) *
            mk(lockPartitions = 1<<4))
 
-postgres *= pgopt + pgstock
+postgres *= pgopt #+ pgstock
 postgres *= mk(malloc = "tcmalloc")
 postgres *= mk(bufferCache = 2048)
 
@@ -268,9 +268,9 @@ metis *= mk(order = ["rr"])
 #configSpace = exim.merge(shared)
 #configSpace = memcached.merge(shared)
 #configSpace = apache.merge(shared)
-#configSpace = postgres.merge(shared)
+configSpace = postgres.merge(shared)
 #configSpace = gmake.merge(shared)
-configSpace = psearchy.merge(shared)
+#configSpace = psearchy.merge(shared)
 #configSpace = metis.merge(shared)
 
 ##################################################################
