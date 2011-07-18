@@ -175,11 +175,12 @@ postgres = mk(benchmark = postgres.runner, nonConst = True)
 
 postgres *= mk(postgresClient = hosts.postgresClient)
 
-postgres *= mk(rows = 10000000)
+postgres *= mk(rows = 100000)
 postgres *= mk(partitions = 0)
 postgres *= mk(batchSize = 256)
 if sanityRun:
-    postgres *= mk(randomWritePct = [5])
+   postgres *= mk(randomWritePct = [0])
+    #postgres *= mk(randomWritePct = [5])
 else:
     postgres *= mk(randomWritePct = [0, 5])
 
@@ -190,9 +191,9 @@ pgstock = (mk(sleep = "sysv") * mk(semasPerSet = 16) *
            mk(lwScale = False) * mk(lockScale = False) *
            mk(lockPartitions = 1<<4))
 
-postgres *= pgopt + pgstock
+postgres *= pgopt #+ pgstock
 postgres *= mk(malloc = "tcmalloc")
-postgres *= mk(bufferCache = 2048)
+postgres *= mk(bufferCache = 1024)
 
 ##################################################################
 # gmake
