@@ -77,7 +77,7 @@ class Host(Task, SourceFileProvider):
 
     __info__ = ["host"]
 
-    def __init__(self, host, cmdModifier = None):
+    def __init__(self, host, cmdModifier = None, namePrefix = None):
         """Create a Host task that will connect to the given host name
         via ssh.  host must be a routable host name for any of the
         hosts used in the experiment.  DO NOT use 'localhost'.  This
@@ -95,13 +95,18 @@ class Host(Task, SourceFileProvider):
             raise ValueError("Host name must be routable from all of the "
                              "hosts in the experiment.")
 
-        Task.__init__(self, host = host)
+        if namePrefix != None:
+            Task.__init__(self, namePrefix = namePrefix, host = host)
+            self.__rootDir = "/tmp/mparts-%s-%x" % (namePrefix, abs(hash(SCRIPT_PATH)))
+        else:
+            Task.__init__(self, host = host)
+            self.__rootDir = "/tmp/mparts-%x" % abs(hash(SCRIPT_PATH))
+
         self.host = host
         self.__cmdModifier = cmdModifier
         self.__routes = {}
         self.__rConn = None
         self.__sudoConn = None
-        self.__rootDir = "/tmp/mparts-%x" % abs(hash(SCRIPT_PATH))
         self.__isLocalhost = isLocalhost(host)
 
         for p in ["__init__.py", "server.py", "rpc.py"]:
