@@ -272,19 +272,20 @@ __all__.append("SystemMonitor")
 class SystemMonitor(Task, SourceFileProvider):
     __info__ = ["host"]
 
-    def __init__(self, host):
+    def __init__(self, host, mtraceName = None):
         Task.__init__(self, host = host)
         self.host = host
         self.__script = self.queueSrcFile(host, "sysmon")
+        self.__mtraceName = mtraceName
 
-    def wrap(self, cmd, start = None, end = None, mtraceName = None):
+    def wrap(self, cmd, start = None, end = None):
         out = [self.__script]
         if start != None:
             out.extend(["-s", start])
         if end != None:
             out.extend(["-e", end])
-        if mtraceName != None:
-            out.extend(["-mtrace", mtraceName])
+        if self.__mtraceName != None:
+            out.extend(["-mtrace", self.__mtraceName])
 
         out.extend(cmd)
         return out

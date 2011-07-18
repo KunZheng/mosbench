@@ -30,11 +30,13 @@ class TimeMonitor(object):
     if LINUX_VERSION >= 24:
         COLS.append("guest");
 
-    def __init__(self):
+    def __init__(self, mtrace = None, mtraceCmd = "mtrace-magic"):
         self.__f = file("/proc/stat", "r", 0)
         self.__start = None
         self.__completed = False
         self.__cumm = [0] * len(self.COLS)
+        self.__mtrace = mtrace
+        self.__mtraceCmd = mtraceCmd
 
     def sample(self):
         self.__f.seek(0)
@@ -49,10 +51,14 @@ class TimeMonitor(object):
         if self.__start:
             raise RuntimeError("Already started")
         self.__start = self.sample()
+        if self.__mtrace != None:
+            subprocess.check_call([self.__mtraceCmd, "enable", self.__mtrace])
 
     def stop(self):
         if not self.__start:
             return
+        if self.__mtrace != None:
+            subprocess.check_call([self.__mtraceCmd, "disable", self.__mtrace])
         delta = vsub(self.sample(), self.__start)
         if len(delta) > len(self.COLS):
             delta = delta[:len(self.COLS)]
@@ -68,17 +74,6 @@ class TimeMonitor(object):
             out.extend([c, "%g" % d])
         return " ".join(out)
 
-class Mtrace(object):
-    def __init__(self, name, cmd="mtrace-magic"):
-        self.cmd = cmd
-        self.name = name
-
-    def start(self):
-        subprocess.check_call([self.cmd, "enable", self.name])
-
-    def stop(self):
-        subprocess.check_call([self.cmd, "disable", self.name])        
-
 args = sys.argv[1:]
 start = end = proc = None
 mtrace = None
@@ -89,7 +84,7 @@ while args and args[0].startswith("-"):
     elif arg == "-e" and args:
         end = args.pop(0)
     elif arg == "-mtrace" and args:
-        mtrace = Mtrace(args.pop(0))
+        mtrace = args.pop(0)
     else:
         usage()
 triggers = [start, end]
@@ -101,11 +96,9 @@ else:
     proc = subprocess.Popen(args, stdout = subprocess.PIPE)
     f = proc.stdout
 
-m = TimeMonitor()
+m = TimeMonitor(mtrace = mtrace)
 if start == None:
     m.start()
-if mtrace:
-    mtrace.start()
 while True:
     l = f.readline()
     if not l:
@@ -118,8 +111,6 @@ while True:
         m.stop()
         triggers[1] = None
     sys.stdout.flush()
-if mtrace:
-    mtrace.stop()
 if end == None:
     m.stop()
 

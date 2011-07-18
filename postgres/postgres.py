@@ -242,7 +242,7 @@ class Postgres(Task):
             # XXX Use standard monitor function
             done = False
             for retry in range(20):
-                time.sleep(0.5)
+                time.sleep(5)
                 log = self.host.r.readFile(logPath)
                 if "database system is ready" in log:
                     done = True
@@ -256,7 +256,7 @@ class Postgres(Task):
 
             # Start up failed.  Make sure postmaster has exited.
             for retry in range(10):
-                time.sleep(0.5)
+                time.sleep(5)
                 if not self.__getPostmaster():
                     break
             else:
@@ -297,7 +297,7 @@ class Postgres(Task):
             import signal
             self.host.r.kill(pid, signal.SIGINT)
             for retry in range(10):
-                time.sleep(0.5)
+                time.sleep(5)
                 ps = self.host.r.procList()
                 if pid not in ps:
                     return

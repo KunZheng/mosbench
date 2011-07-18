@@ -48,8 +48,8 @@ class GmakeLoad(Task, ResultsProvider, SourceFileProvider):
         # XXX If we want to eliminate the serial startup, monitor
         # starting with "  CHK include/generated/compile.h" or maybe
         # with the first "  CC" line.
-        self.host.r.run(self.sysmon.wrap(self.__cmd("mosbench-gmake-" + BENCHMARK),
-                                         mtraceName="gmake"), stdout = logPath)
+        self.host.r.run(self.sysmon.wrap(self.__cmd("mosbench-gmake-" + BENCHMARK)), 
+                        stdout = logPath)
 
         # Get result
         log = self.host.r.readFile(logPath)
@@ -78,7 +78,7 @@ class GmakeRunner(object):
                                             "x86", "include"), ["*/.git"])
         if cfg.hotplug:
             m += SetCPUs(host = host, num = cfg.cores)
-        sysmon = SystemMonitor(host)
+        sysmon = SystemMonitor(host, mtraceName = "gmake")
         m += sysmon
         for trial in range(cfg.trials):
             m += GmakeLoad(host, trial, cfg.cores, cfg.kernelRoot, fs.path + "0",

@@ -183,7 +183,7 @@ class PostgresRunner(object):
         # not spread things out if we have more queues than cores.
 #        m += IXGBE(host, "eth0", queues = "n%min(NCPU, NRX if rx else NTX)")
 
-        sysmon = ExplicitSystemMonitor(host)
+        sysmon = ExplicitSystemMonitor(host, mtraceName = "postgres")
         m += sysmon
         for trial in range(cfg.trials):
             m += PostgresLoad(loadgen, trial, pg, cfg.cores, cfg.cores,
