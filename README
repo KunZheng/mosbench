@@ -82,9 +82,10 @@ Once that works, set sanityRun to False and run 'make bench'.
 Each full benchmark run is stored under a results/TIMESTAMP directory
 relative to where you ran 'make bench'.  This directory contains a
 subtree where each data point is stored in a leaf directory whose path
-encodes the configuration of that data point.  If this directory also
-contains a file called 'incomplete', then the run failed before
-executing every configured data point.
+encodes the configuration of that data point.  Failed and interrupted
+runs are stored in results/incomplete/TIMESTAMP and contain a file
+called 'incomplete' in the top-level directory.  Sanity-check runs are
+stored in a parallel tree under sanity/.
 
 Each data point directory saves that point's result, its detailed
 configuration, and log files and output files from commands run by the

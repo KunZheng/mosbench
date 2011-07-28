@@ -281,5 +281,5 @@ if __name__ == "__main__":
     from mparts.rpc import print_remote_exception
     import sys
     sys.excepthook = print_remote_exception
-    for (m, cfg) in generateManagers("results", configSpace):
+    for (m, cfg) in generateManagers("sanity" if sanityRun else "results", configSpace):
         cfg.benchmark.run(m, cfg)
