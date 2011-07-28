@@ -34,15 +34,13 @@ class MetisLoad(Task, ResultsProvider):
         if self.fs:
             self.fs.clean()
 
-        cpuseq = ",".join(map(str, self.setcpus.getSeq()))
-
         obj = os.path.join(self.metisPath, "obj." + self.model)
         cmd = [os.path.join(obj, "app",
                             "wrmem" + (".sf" if self.streamflow else "")),
                "-p", str(self.cores)]
         cmd = self.sysmon.wrap(cmd, "Starting mapreduce", "Finished mapreduce")
         addEnv = {"LD_LIBRARY_PATH" : os.path.join(obj, "lib"),
-                  "CPUSEQ" : cpuseq}
+                  "CPUSEQ" : self.setcpus.getSeqStr()}
 
         # Run
         logPath = self.host.getLogPath(self)
