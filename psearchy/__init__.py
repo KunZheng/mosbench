@@ -20,7 +20,7 @@ class PsearchyLoad(Task, ResultsProvider):
                 "mode", "order", "mem", "dblim", "trial", "*sysmonOut"]
 
     def __init__(self, host, trial, psearchyPath, filesPath, dbPath, cores,
-                 mode, order, mem, dblim, sysmon):
+                 mode, order, mem, dblim, setcpus, sysmon):
         assert mode in [PsearchyLoad.MODE_THREAD, PsearchyLoad.MODE_PROCESS], \
             "Invalid mode %s" % mode
         assert order in [PsearchyLoad.ORDER_SEQ, PsearchyLoad.ORDER_RR], \
@@ -37,6 +37,7 @@ class PsearchyLoad(Task, ResultsProvider):
         self.order = order
         self.mem = mem
         self.dblim = dblim
+        self.setcpus = setcpus
         self.sysmon = sysmon
 
     def wait(self, m):
@@ -47,8 +48,6 @@ class PsearchyLoad(Task, ResultsProvider):
                "-m", str(self.mem)]
         if self.mode == PsearchyLoad.MODE_PROCESS:
             cmd.append("-p")
-        if self.order == PsearchyLoad.ORDER_RR:
-            cmd.extend(["-s", "1"])
         if self.dblim:
             cmd.extend(["-l", str(self.dblim)])
         # For the submission, we measured the entire time, including
@@ -62,6 +61,7 @@ class PsearchyLoad(Task, ResultsProvider):
         # Run
         logPath = self.host.getLogPath(self)
         self.host.r.run(cmd, stdin = self.filesPath, stdout = logPath,
+                        addEnv = {"CPUSEQ" : self.setcpus.getSeqStr()},
                         wait = CHECKED)
 
         # Get result
@@ -111,15 +111,15 @@ class PsearchyRunner(object):
         files = Mkfiles(host, psearchyPath, cfg.textRoot)
         m += files
         m += PrefetchList(host, files.filesPath, reuse = True)
-        # XXX Tell mkdb the CPU sequence
-        m += SetCPUs(host = host, num = cfg.cores, hotplug = cfg.hotplug,
-                     seq = cfg.order)
+        setcpus = SetCPUs(host = host, num = cfg.cores, hotplug = cfg.hotplug,
+                          seq = cfg.order)
+        m += setcpus
         sysmon = SystemMonitor(host)
         m += sysmon
         for trial in range(cfg.trials):
             m += PsearchyLoad(host, trial, psearchyPath, files.filesPath,
                               fs.path, cfg.cores, cfg.mode, cfg.order, cfg.mem,
-                              cfg.dblim, sysmon)
+                              cfg.dblim, setcpus, sysmon)
         # XXX
         # m += cfg.monitors
         m.run()
