@@ -237,6 +237,23 @@ struct cpuinfo
 
 static void get_cpu_sequence(int order, int *seq)
 {
+  if (getenv("CPUSEQ")) {
+    char *cpuseq = strdup(getenv("CPUSEQ"));
+    char *tok, *pos = cpuseq;
+    int n = 0;
+    while ((tok = strsep(&pos, ",")) && n < ncore) {
+      seq[n++] = atoi(tok);
+    }
+    free(cpuseq);
+
+    if (n < ncore) {
+      fprintf(stderr, "Number of cores requested %d > CPUSEQ %d",
+              ncore, n);
+      exit(-1);
+    }
+    return;
+  }
+
   // Parse cpuinfo file
   std::vector<cpuinfo> cpus;
   
