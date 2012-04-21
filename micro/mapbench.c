@@ -14,14 +14,14 @@ static struct {
 	struct {
 	    volatile int ready;
 	    volatile uint64_t cycle;
-    	    volatile uint64_t usec;
+    	    volatile double tput;
 	};
 	char pad[CACHE_BYTES];
     } cpu[MAX_CPU] __attribute__((aligned(CACHE_BYTES)));
 } *sync_state;
 
 static int npg = 1;
-static int readaccess = 1;
+static int reference = 1;
 static int niter;
 static int ncores;
 
@@ -53,7 +53,7 @@ worker(void *x)
 	    exit(-1);
 	  }
 	  
-	  if (readaccess) {
+	  if (reference) {
 	    for (j = 0; j < npg * 4096; j++)
 	      p[j] = '\0';
 	  }
@@ -66,19 +66,19 @@ worker(void *x)
 	}
 	
 	sync_state->cpu[i].cycle = read_tsc() - s;
-	sync_state->cpu[i].usec = usec() - t;
-
+	double sec = (usec() - t) / 1000000.0;
+	sync_state->cpu[i].tput = (double) niter / sec;
 	return 0;
 }
 
 static void waitup(void)
 {
-       uint64_t tot, max, tot_usec;
+        uint64_t tot, max;
 	int i;
+	double avg = 0.0;
 
 	tot = 0;
 	max = 0;
-	tot_usec = 0;
 	for (i = 0; i < ncores; i++) {
 		while (!sync_state->cpu[i].cycle)
 			nop_pause();
@@ -86,11 +86,11 @@ static void waitup(void)
 		tot += sync_state->cpu[i].cycle;
 		if (sync_state->cpu[i].cycle > max)
 			max = sync_state->cpu[i].cycle;
-		tot_usec += sync_state->cpu[i].usec;
+		avg += sync_state->cpu[i].tput;
 	}
 
-	printf("%d cores completed %d map+unmap in %"PRIu64" cycles %f usec\n", ncores, niter, tot, 
-	       tot_usec);
+	printf("%d cores completed %d map+unmap in %"PRIu64" cycles %lu tput %.3g\n", 
+	       ncores, niter, tot, avg/ncores);
 }
 
 int main(int ac, char **av)
