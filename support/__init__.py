@@ -112,6 +112,9 @@ class SetCPUs(Task, SourceFileProvider):
                 "Cannot get CPU sequences before SetCPUs has started")
         return CPU_CACHE[self.host][1][self.seq][:self.num]
 
+    def getSeqStr(self):
+        return ",".join(map(str, self.getSeq()))
+
     def start(self):
         # oprofile has a habit of panicking if you hot plug CPU's
         # under it

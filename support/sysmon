@@ -56,6 +56,12 @@ class TimeMonitor(object):
         delta = vsub(self.sample(), self.__start)
         if len(delta) > len(self.COLS):
             delta = delta[:len(self.COLS)]
+        # The kernel's total idle reporting is bogus (in 2.6.37 at
+        # least); compute our own idle time
+        self.__f.seek(0)
+        ncpus = len([l for l in self.__f.readlines()
+                     if l.startswith("cpu")]) - 1
+        delta[4] = ncpus * delta[0] - (delta[1] + delta[3])
         self.__cumm = vadd(self.__cumm, delta)
         self.__start = None
         self.__completed = True

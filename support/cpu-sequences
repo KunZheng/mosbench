@@ -1,9 +1,38 @@
 #!/usr/bin/python
 
+import errno
+
 cpuinfo = [dict(map(str.strip, line.split(":", 1))
                 for line in block.splitlines())
            for block in file("/proc/cpuinfo", "r").read().split("\n\n")
            if len(block.strip())]
+
+# Keep only primary hyperthreads
+primaries = set()
+for cpu in cpuinfo:
+    processor = cpu["processor"]
+    try:
+        s = file("/sys/devices/system/cpu/cpu%s/topology/thread_siblings_list" % processor).read()
+    except EnvironmentError, e:
+        if e.errno == errno.ENOENT:
+            primaries.add(processor)
+            continue
+        raise
+    ss = set(map(int, s.split(",")))
+    if int(processor) == min(ss):
+        primaries.add(processor)
+cpuinfo = [cpu for cpu in cpuinfo if cpu["processor"] in primaries]
+
+def seq(cpuinfo):
+    packages = {}
+    for cpu in cpuinfo:
+        if "physical id" in cpu:
+            packages.setdefault(int(cpu["physical id"]), []).append(cpu)
+        else:
+            yield cpu
+    for package in sorted(packages.keys()):
+        for cpu in packages[package]:
+            yield cpu
 
 def rr(cpuinfo):
     while len(cpuinfo):
@@ -21,6 +50,5 @@ def rr(cpuinfo):
 
         cpuinfo = next
 
-# Sequential assignment
-print "seq %s" % ",".join(cpu["processor"] for cpu in cpuinfo)
+print "seq %s" % ",".join(cpu["processor"] for cpu in seq(cpuinfo))
 print "rr %s" % ",".join(cpu["processor"] for cpu in rr(cpuinfo))

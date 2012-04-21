@@ -317,7 +317,8 @@ class ResultPath(Task):
 
 def generateManagers(resultRoot, configSpace):
     ts = time.strftime("%Y%m%d-%H%M%S")
-    basepath = os.path.join(resultRoot, ts)
+    basepath = os.path.join(resultRoot, "incomplete", ts)
+    finalpath = os.path.join(resultRoot, ts)
 
     # Set up initial results directory
     maybeMakedirs(basepath)
@@ -350,4 +351,5 @@ def generateManagers(resultRoot, configSpace):
 
     # All configurations are complete
     os.unlink(incomplete)
-    prNotice(2, "All results in: %s" % basepath)
+    os.rename(basepath, finalpath)
+    prNotice(2, "All results in: %s" % finalpath)
