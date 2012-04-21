@@ -1,10 +1,14 @@
 /*
- * Create threads, mmap non-overlapping address range, reference it, and unmap it.
+ * Each process: create a few files in a directory, open files for a
+ * number of iterations, and unlink them.
  */
 
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <sys/mman.h>
 #include <stdio.h>
-#include <pthread.h>
 
 #include "bench.h"
 
@@ -20,10 +24,12 @@ static struct {
     } cpu[MAX_CPU] __attribute__((aligned(CACHE_BYTES)));
 } *sync_state;
 
-static int npg = 1;
-static int reference = 1;
+#define MAXNAME 64
+
 static int niter;
 static int ncores;
+static int nfile = 10;
+static char dirs[MAX_CPU][MAXNAME];
 
 static void *
 worker(void *x)
@@ -32,6 +38,7 @@ worker(void *x)
 	uint64_t s;
 	int k, j;
 	uint64_t t;
+	char pn[MAXNAME];
 
 	setaffinity(i);
 	sync_state->cpu[i].ready = 1;
@@ -45,26 +52,36 @@ worker(void *x)
 	t = usec();
 
 	for (k = 0; k < niter; k++) {
-	  volatile char *p = (char*) (0x100000000UL + i * npg * 0x100000);
 
-	  if (mmap((void *) p, npg * 4096, PROT_READ|PROT_WRITE,
-		   MAP_PRIVATE|MAP_FIXED|MAP_ANONYMOUS, -1, 0) == MAP_FAILED) {
-	    fprintf(stderr, "%d: map failed\n", i);
-	    exit(-1);
-	  }
-	  
-	  if (reference) {
-	    for (j = 0; j < npg * 4096; j++)
-	      p[j] = '\0';
+	  for (j = 0; j < nfile; j++) {
+	    snprintf(pn, sizeof(pn), "%s/f:%d:%d", dirs[i], i, j);
+	    // printf("path %s\n", pn);
+	    int fd = open(pn, O_CREAT | O_RDWR, S_IRUSR|S_IWUSR|S_IXUSR);
+	    if (fd < 0)
+	      perror("create failed");
+
+	    close(fd);
 	  }
 
-	  if (munmap((void *) p, npg * 4096) < 0) {
-	    fprintf(stderr, "%d: unmap failed\n", i);
-	    exit(-1);
+	  for (j = 0; j < niter; j++) {
+	    snprintf(pn, sizeof(pn), "%s/f:%d:%d", dirs[i], i, (j % nfile));
+	    int fd = open(pn, O_RDWR);
+	    if (fd < 0) {
+	      perror("open failed");
+	      exit(-1);
+		}
+
+	    close(fd);
+	  }
+
+	  for (j = 0; j < nfile; j++) {
+	    snprintf(pn, sizeof(pn), "%s/f:%d:%d", dirs[i], i, j);
+	    if (unlink(pn) < 0)
+	      fprintf(stderr, "unlink failed\n");
 	  }
 
 	}
-	
+
 	sync_state->cpu[i].cycle = read_tsc() - s;
 	double sec = (usec() - t) / 1000000.0;
 	sync_state->cpu[i].tput = (double) niter / sec;
@@ -95,17 +112,21 @@ static void waitup(void)
 
 int main(int ac, char **av)
 {
-	int threads;
-	pthread_t th;
 	int i;
 
 	setaffinity(0);
 	if (ac < 3)
-		die("usage: %s num-cores niter use-threads", av[0]);
+		die("usage: %s num-cores niter", av[0]);
 	
 	ncores = atoi(av[1]);
 	niter = atoi(av[2]);
-	threads = atoi(av[3]);
+
+	for (i = 0; i < ncores; i++) {
+	  //snprintf(dirs[i], sizeof(dirs[i]), "/db%d", i);
+	  snprintf(dirs[i], sizeof(dirs[i]), "/tmp/dirbench");
+	}
+	if (mkdir(dirs[0], S_IRUSR|S_IWUSR|S_IXUSR) < 0)
+	    fprintf(stderr, "mkdir failed\n");
 
 	sync_state = (void *) mmap(0, sizeof(*sync_state), 
 				   PROT_READ | PROT_WRITE, 
@@ -115,24 +136,25 @@ int main(int ac, char **av)
 	memset(sync_state, 0, sizeof(*sync_state));
     
 	for (i = 1; i < ncores; i++) {
-		if (threads) {
-			if (pthread_create(&th, NULL, worker, (void *)(intptr_t)i) < 0)
-				edie("pthread_create");
-		} else {
-			pid_t p = fork();
-			if (p < 0)
-				edie("fork");
-			if (!p) {
-				worker((void *)(intptr_t)i);
-				return 0;
-			}
-		}
+	  pid_t p = fork();
+	  if (p < 0)
+	    edie("fork");
+	  if (!p) {
+	    worker((void *)(intptr_t)i);
+	    return 0;
+	  }
 		
-		while (!sync_state->cpu[i].ready)
-			nop_pause();
+	  while (!sync_state->cpu[i].ready)
+	    nop_pause();
 	}
 
 	worker((void *)(intptr_t)0);
 	waitup();
+
+	for (i = 0; i < 1; i++) {
+	  //snprintf(dirs[i], sizeof(dirs[i]), "/db%d", i);
+	  rmdir(dirs[i]);
+	}
+
 	return 0;
 }

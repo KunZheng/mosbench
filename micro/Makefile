@@ -22,7 +22,7 @@ CFLAGS  = $(DEFS) -Wall -Werror -fno-strict-aliasing $(CWARNS) \
 LIBS	= bench.c
 DEPS	= bench.h config.h list.h $(LIBS) $(MTRACEDEP) $(SUPPORT)/mtrace.h
 
-BINS	= memclone fops-dir proc-ping-pong lock latency mapbench
+BINS	= memclone fops-dir proc-ping-pong lock latency mapbench dirbench
 BINS	:= $(addprefix $(O)/, $(BINS))
 
 all: $(BINS)
