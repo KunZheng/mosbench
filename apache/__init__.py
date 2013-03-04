@@ -75,6 +75,9 @@ class Apache(Task):
         opts["PidFile"] = self.host.outDir("%s.pid" % self.name)
         self.host.r.writeFile(self.__configPath, self.__optsToConffile(opts))
 
+        # Create Error log so that Apache doesn't complain
+        self.host.r.writeFile(opts["ErrorLog"], "", append=True)
+
         # Start Apache.  Conveniently, by the time this returns the
         # server is listening.
         self.host.r.run([self.__httpd, "-f", self.__configPath, "-k", "start"])
