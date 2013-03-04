@@ -23,9 +23,11 @@ tested.
 
 MOSBENCH must be installed on the primary host (and driver host, if
 separate), but does not need to be installed on the client machines.
-The client machines must have rsync, g++, httperf, and Postgres
-libraries (libpq-dev on Debian/Ubuntu).  The driver host will push any
-additional files to the clients as needed.
+The client machines must have:
+  rsync g++ httperf libpq-dev libpcre3-dev libevent-dev ibreadline-dev
+  gettext libdb-dev libnuma-dev numactl ibtcmalloc-minimal0 gnuplot
+The driver host will push any additional files to the clients as
+needed.
 
 
 === Setup ===
