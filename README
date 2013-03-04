@@ -47,7 +47,9 @@ driver host.  This file stores static configuration information like
 the locations of various files, as well as which benchmarks to run and
 the full set of data points to gather results for.  It depends on
 hosts.py, which lists the primary host and all client machines used by
-the benchmark.
+the benchmark.  Additionally, if your hosts are not using IXGBE
+network adapters, comment out the "m += IXGBE(...)" lines in
+{apache,memcached}/__init__.py.
 
 The benchmark applications must be compiled on the primary host.  To
 do so, simply run 'make all' from the MOSBENCH checkout directory on
