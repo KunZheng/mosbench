@@ -46,7 +46,7 @@ CFLAGS	:= -std=c99 -fms-extensions -D_GNU_SOURCE -Wall $(OPTFLAG) \
 	   -DJOS_CLINE=64 -DCACHE_LINE_SIZE=64 -MD $(SF_MMOPT) 	   \
 	   -DJOS_NCPU=$(MAXCPUS) -fno-omit-frame-pointer
 
-COMMON_LIB := -lc -lm -lpthread -lrt
+COMMON_LIB := -lc -lm -lpthread -lrt -ldl
 LIB	   := -L$(O)/lib -lmetis $(COMMON_LIB) 
 SF_LIB	   := -L$(O)/lib -lmetis -ldl -lstreamflow -lnuma $(COMMON_LIB) -Wl,-rpath,obj/lib
 
