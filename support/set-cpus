@@ -28,7 +28,7 @@ def printRange(vals):
             out.append("%d-%d" % (lo, hi))
     return ",".join(out)
 
-possible = parseRange(file("/sys/devices/system/cpu/possible").read())
+possible = parseRange(file("/sys/devices/system/cpu/present").read())
 fixed = [n for n in possible
          if not os.path.exists("/sys/devices/system/cpu/cpu%d/online" % n)]
 
